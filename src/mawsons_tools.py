@@ -26,7 +26,7 @@ class FigurePaths:
     animation_dir: Path
 
 
-class Mawsons_Tools:
+class toolbelt:
     """
     Lightweight figure/diagnostic toolbox for direct CICE history files and
     daily NSIDC sea-ice concentration files.

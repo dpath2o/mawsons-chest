@@ -2,7 +2,7 @@
 
 A lightweight toolbox for **direct CICE ice-history analysis and figure generation**.
 
-`mawsons-chest` is designed for workflows built around native `iceh.*.nc` files, with no requirement to first reorganise the data into Zarr stores. The current plotting and diagnostics flow is centered on the `SeaIceFigureToolbox` class in `src/sea_ice_figure_toolbox.py`.
+`mawsons-chest` is designed for workflows built around native `iceh.*.nc` files, with no requirement to first reorganise the data into Zarr stores. The current plotting and diagnostics flow is centered on the `SeaIceFigureToolbox` class in `src/mawsons_tools.py`.
 
 ## What it does
 
@@ -29,7 +29,7 @@ Core capabilities include:
 mawsons-chest/
 ├── README.md
 └── src/
-    └── sea_ice_figure_toolbox.py
+    └── mawsons_tools.py
 ```
 
 A typical workflow is:
@@ -69,22 +69,15 @@ On NCI / Gadi, you will also want the system GMT installation and the same Pytho
 Assuming the repository root is on your Python path and the default directories match your current Gadi layout:
 
 ```python
-from src.sea_ice_figure_toolbox import SeaIceFigureToolbox
+from src.mawsons_tools import toolbelt
 
-tb = SeaIceFigureToolbox()
+tb = toolbelt()
 
 # Plot daily sea-ice concentration with southern NSIDC contour
-tb.plot_aice_day(
-    "1993-04-24",
-    add_nsidc_south=True,
-    show=True,
-)
+tb.plot_aice_day("1993-04-24", add_nsidc_south=True, show=True)
 
 # Plot daily sea-ice thickness
-tb.plot_hi_day(
-    "1993-04-24",
-    show=True,
-)
+tb.plot_hi_day("1993-04-24", show=True)
 ```
 
 ## Example with explicit paths
@@ -93,18 +86,16 @@ If you want to override the defaults at initialisation:
 
 ```python
 from pathlib import Path
-from src.sea_ice_figure_toolbox import SeaIceFigureToolbox
+from src.mawsons_tools import toolbelt
 
-tb = SeaIceFigureToolbox(
-    cice_history_dir=Path("/g/data/gv90/da1339/cice-dirs/runs/free-slip-waves/history"),
-    nsidc_daily_south_dir=Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/south/daily"),
-    nsidc_daily_north_dir=Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/north/daily"),
-    nsidc_cell_area_south=Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_S25km_v1.1.nc"),
-    nsidc_cell_area_north=Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_N25km_v1.1.nc"),
-    output_dir=Path("./figures"),
-    animation_dir=Path("./animations"),
-    sic_threshold=0.15,
-)
+tb = toolbelt(cice_history_dir      = Path("/g/data/gv90/da1339/cice-dirs/runs/free-slip-waves/history"),
+              nsidc_daily_south_dir = Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/south/daily"),
+              nsidc_daily_north_dir = Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/north/daily"),
+              nsidc_cell_area_south = Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_S25km_v1.1.nc"),
+              nsidc_cell_area_north = Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_N25km_v1.1.nc"),
+              output_dir            = Path("./figures"),
+              animation_dir         = Path("./animations"),
+              sic_threshold         = 0.15)
 ```
 
 ## Core methods
@@ -144,12 +135,10 @@ tb = SeaIceFigureToolbox(
 ## Example: annotate daily concentration
 
 ```python
-tb = SeaIceFigureToolbox()
-
-ds = tb.load_cice_day("1993-04-24")
+tb     = toolbelt()
+ds     = tb.load_cice_day("1993-04-24")
 dt_str = tb.cice_corrected_datestr(ds)
-ext = tb.compute_cice_ice_extent(ds)
-
+ext    = tb.compute_cice_ice_extent(ds)
 print(dt_str)
 print(ext["south"], ext["north"], ext["units"])
 ```
@@ -157,11 +146,9 @@ print(ext["south"], ext["north"], ext["units"])
 ## Example: aggregate hemispheric thickness
 
 ```python
-tb = SeaIceFigureToolbox()
-
-ds = tb.load_cice_day("1993-04-24")
+tb    = toolbelt()
+ds    = tb.load_cice_day("1993-04-24")
 stats = tb.compute_cice_area_volume_thickness(ds)
-
 print("SH aggregate SIT:", stats["south"]["SIT"], stats["SIT_units"])
 print("NH aggregate SIT:", stats["north"]["SIT"], stats["SIT_units"])
 ```
@@ -169,16 +156,13 @@ print("NH aggregate SIT:", stats["north"]["SIT"], stats["SIT_units"])
 ## Example: build an animation
 
 ```python
-tb = SeaIceFigureToolbox()
-
-tb.create_animation(
-    dt0_str="1993-04-01",
-    dtN_str="1993-04-30",
-    variable="aice",
-    add_sia_timeseries=True,
-    fps=4,
-    codec="gif",
-)
+tb = toolbelt()
+tb.create_animation(dt0_str            = "1993-04-01",
+                    dtN_str            = "1993-04-30",
+                    variable           = "aice",
+                    add_sia_timeseries = True,
+                    fps                = 4,
+                    codec              = "gif")
 ```
 
 ## Assumptions
