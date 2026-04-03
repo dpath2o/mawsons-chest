@@ -2,7 +2,7 @@
 
 A lightweight toolbox for **direct CICE ice-history analysis and figure generation**.
 
-`mawsons-chest` is designed for workflows built around native `iceh.*.nc` files, with no requirement to first reorganise the data into Zarr stores. The current plotting and diagnostics flow is centered on the `SeaIceFigureToolbox` class in `src/mawsons_tools.py`.
+`mawsons-chest` is designed for workflows built around native `iceh.*.nc` files, with no requirement to first reorganise the data into Zarr stores. The current plotting and diagnostics flow is centered on the `cice_basics` class in `src/cice_netcdf_tools.py`.
 
 ## What it does
 
@@ -29,7 +29,7 @@ Core capabilities include:
 mawsons-chest/
 ├── README.md
 └── src/
-    └── mawsons_tools.py
+    └── cice_netcdf_tools.py
 ```
 
 A typical workflow is:
@@ -86,16 +86,16 @@ If you want to override the defaults at initialisation:
 
 ```python
 from pathlib import Path
-from src.mawsons_tools import toolbelt
+from src.cice_netcdf_tools import cice_basics
 
-tb = toolbelt(cice_history_dir      = Path("/g/data/gv90/da1339/cice-dirs/runs/free-slip-waves/history"),
-              nsidc_daily_south_dir = Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/south/daily"),
-              nsidc_daily_north_dir = Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/north/daily"),
-              nsidc_cell_area_south = Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_S25km_v1.1.nc"),
-              nsidc_cell_area_north = Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_N25km_v1.1.nc"),
-              output_dir            = Path("./figures"),
-              animation_dir         = Path("./animations"),
-              sic_threshold         = 0.15)
+tb = cice_basics(cice_history_dir      = Path("/g/data/gv90/da1339/cice-dirs/runs/free-slip-waves/history"),
+                 nsidc_daily_south_dir = Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/south/daily"),
+                 nsidc_daily_north_dir = Path("/g/data/gv90/da1339/SeaIce/NSIDC/G02202_V4/north/daily"),
+                 nsidc_cell_area_south = Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_S25km_v1.1.nc"),
+                 nsidc_cell_area_north = Path("/g/data/gv90/da1339/SeaIce/NSIDC/NSIDC0771/NSIDC0771_CellArea_PS_N25km_v1.1.nc"),
+                 output_dir            = Path("./figures"),
+                 animation_dir         = Path("./animations"),
+                 sic_threshold         = 0.15)
 ```
 
 ## Core methods
@@ -135,7 +135,7 @@ tb = toolbelt(cice_history_dir      = Path("/g/data/gv90/da1339/cice-dirs/runs/f
 ## Example: annotate daily concentration
 
 ```python
-tb     = toolbelt()
+tb     = cice_basics()
 ds     = tb.load_cice_day("1993-04-24")
 dt_str = tb.cice_corrected_datestr(ds)
 ext    = tb.compute_cice_ice_extent(ds)
@@ -146,7 +146,7 @@ print(ext["south"], ext["north"], ext["units"])
 ## Example: aggregate hemispheric thickness
 
 ```python
-tb    = toolbelt()
+tb    = cice_basics()
 ds    = tb.load_cice_day("1993-04-24")
 stats = tb.compute_cice_area_volume_thickness(ds)
 print("SH aggregate SIT:", stats["south"]["SIT"], stats["SIT_units"])
@@ -156,7 +156,7 @@ print("NH aggregate SIT:", stats["north"]["SIT"], stats["SIT_units"])
 ## Example: build an animation
 
 ```python
-tb = toolbelt()
+tb = cice_basics()
 tb.create_animation(dt0_str            = "1993-04-01",
                     dtN_str            = "1993-04-30",
                     variable           = "aice",
