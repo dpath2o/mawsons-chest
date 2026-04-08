@@ -1,0 +1,137 @@
+# -----------------------------------------------------------------------------
+# mawsons-chest: gitignore
+# -----------------------------------------------------------------------------
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.venv
+pip-log.txt
+.pytest_cache/
+
+# --- C/C++ ---
+*.o
+*.obj
+*.so
+*.dylib
+*.a
+*.exe
+*.out
+.libs/
+
+# --- Fortran ---
+*.mod
+*.smod
+*.dwo
+
+# --- IDE/Editor/OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*.swo
+*~
+
+# Packaging / build
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing / lint / type-checking caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.nox/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local project state
+logs/
+tmp/
+temp/
+scratch/
+.cache/
+
+# macOS / misc hidden files
+._*
+.Trashes/
+
+# -----------------------------------------------------------------------------
+# Generated scientific data products
+# -----------------------------------------------------------------------------
+# Zarr stores
+*.zarr
+*.zarr/
+
+# NetCDF / HDF / binary scientific data
+*.nc
+*.nc4
+*.cdf
+*.h5
+*.hdf5
+*.grib
+*.grb
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.feather
+*.parquet
+
+# -----------------------------------------------------------------------------
+# Generated visual products
+# -----------------------------------------------------------------------------
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.tif
+*.tiff
+*.svg
+*.pdf
+*.mp4
+*.mov
+*.avi
+*.webm
+
+# -----------------------------------------------------------------------------
+# Compressed archives / transfers
+# -----------------------------------------------------------------------------
+*.tar
+*.tgz
+*.tar.gz
+*.zip
+*.7z
+
+# -----------------------------------------------------------------------------
+# HPC / PBS / Slurm artifacts
+# -----------------------------------------------------------------------------
+*.o*
+*.e*
+*.log
+*.out
+*.err
+
+# -----------------------------------------------------------------------------
+# Optional: keep repo docs/assets if you later add committed figures
+# Uncomment and adapt as needed
+# -----------------------------------------------------------------------------
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.pdf
