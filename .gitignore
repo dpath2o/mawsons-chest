@@ -30,10 +30,12 @@ pip-log.txt
 .vscode/
 .idea/
 *.swp
+*.swn
 .DS_Store
 Thumbs.db
 *.swo
 *~
+*.#*
 
 # Packaging / build
 build/
@@ -127,6 +129,8 @@ scratch/
 *.log
 *.out
 *.err
+*.OU
+*.ER
 
 # -----------------------------------------------------------------------------
 # Optional: keep repo docs/assets if you later add committed figures
