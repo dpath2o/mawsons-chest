@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -P gv90
+#PBS -q normal
+#PBS -l walltime=02:00:00
+#PBS -l ncpus=8
+#PBS -l mem=64GB
+#PBS -l storage=gdata/gv90+scratch/gv90+gdata/jk72+gdata/xp65
+#PBS -j oe
+#PBS -N floes_mthly_sic
+
+# Usage:
+#   cd /path/to/mawsons-chest/floes
+#   qsub ./update_mthly_sea_ice_sci_chat_figs.pbs
+#
+# To override the PBS project without editing this file:
+#   qsub -P <project> ./update_mthly_sea_ice_sci_chat_figs.pbs
+#
+# To override runtime options:
+#   qsub -v FLOES_YEAR=2026,FLOES_MONTH=5,FLOES_GADI_BASE=/g/data/gv90/wrh581 ./update_mthly_sea_ice_sci_chat_figs.pbs
+
+set -euo pipefail
+
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3-25.12
+
+cd "${PBS_O_WORKDIR:-$PWD}"
+
+PROJECT="${PROJECT:-${PBS_PROJECT:-gv90}}"
+GADI_USER="${GADI_USER:-${USER}}"
+FLOES_GADI_BASE="${FLOES_GADI_BASE:-/g/data/gv90/wrh581}"
+
+export OMP_NUM_THREADS=1
+export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
+
+ARGS=(--project "$PROJECT" --user "$GADI_USER" --gadi-base "$FLOES_GADI_BASE")
+
+if [[ -n "${FLOES_YEAR:-}" ]]; then
+    ARGS+=(--year "$FLOES_YEAR")
+fi
+if [[ -n "${FLOES_MONTH:-}" ]]; then
+    ARGS+=(--month "$FLOES_MONTH")
+fi
+if [[ "${FLOES_STRICT:-0}" == "1" ]]; then
+    ARGS+=(--strict)
+fi
+if [[ "${FLOES_VERBOSE:-1}" == "1" ]]; then
+    ARGS+=(--verbose)
+fi
+
+python -u scripts/update_mthly_sea_ice_sci_chat_figs.py "${ARGS[@]}"
