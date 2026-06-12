@@ -1,13 +1,17 @@
 # Monthly Sea Ice Science Chat Figures
 
-Last refreshed: 2026-06-07T14:15:58
+Last refreshed: 2026-06-07T15:02:11
 
 Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat`
 
-No figures were found yet.
+## ERA5 wind SIE SH 202512
 
-Run:
+![ERA5 wind SIE SH 202512](../figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202512.png)
 
-```bash
-qsub ./update_mthly_sea_ice_sci_chat_figs.pbs
-```
+## NSIDC SH sic anomaly 202604
+
+![NSIDC SH sic anomaly 202604](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202604.png)
+
+## OISST global sst anomaly 202604
+
+![OISST global sst anomaly 202604](../figs/mthly_sea_ice_sci_chat/OISST_global_sst_anomaly_202604.png)

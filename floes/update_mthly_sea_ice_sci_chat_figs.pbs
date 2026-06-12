@@ -33,7 +33,11 @@ FLOES_GADI_BASE="${FLOES_GADI_BASE:-/g/data/gv90/wrh581}"
 export OMP_NUM_THREADS=1
 export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
 
-ARGS=(--project "$PROJECT" --user "$GADI_USER" --gadi-base "$FLOES_GADI_BASE")
+ARGS=(
+    --project "$PROJECT"
+    --user "$GADI_USER"
+    --gadi-base "$FLOES_GADI_BASE"
+)
 
 if [[ -n "${FLOES_YEAR:-}" ]]; then
     ARGS+=(--year "$FLOES_YEAR")
@@ -44,7 +48,7 @@ fi
 if [[ "${FLOES_STRICT:-0}" == "1" ]]; then
     ARGS+=(--strict)
 fi
-if [[ "${FLOES_VERBOSE:-1}" == "1" ]]; then
+if [[ "${FLOES_VERBOSE:-0}" == "1" ]]; then
     ARGS+=(--verbose)
 fi
 

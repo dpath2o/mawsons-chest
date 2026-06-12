@@ -6,7 +6,7 @@ import xarray as xr
 
 from floes.config import FloesConfig
 from floes.io.gadi import find_product_files, open_product
-from .sea_ice import compute_sia_sie, monthly_anomaly, monthly_climatology, select_year_month, standardise_sic
+from .sea_ice import compute_sia_sie, monthly_climatology, resolve_year_month, select_year_month, standardise_sic
 
 
 @dataclass
@@ -28,7 +28,6 @@ class NSIDCReader:
         if "cell_area" in ds:
             area = ds["cell_area"]
         else:
-            # Ancillary G02202 files can differ. Prefer the first 2D area-like field.
             candidates = [v for v in ds.data_vars if "area" in v.lower()]
             if not candidates:
                 raise KeyError(f"No area variable found in {self.area_key}; variables={list(ds.data_vars)}")
@@ -38,7 +37,7 @@ class NSIDCReader:
 
     def sic(self) -> xr.DataArray:
         ds = self.open_sic_dataset()
-        for name in ("cdr_seaice_conc_monthly", "cdr_seaice_conc", "ice_conc", "seaice_conc"):
+        for name in ("cdr_seaice_conc_monthly", "cdr_seaice_conc", "ice_conc", "seaice_conc", "sic"):
             if name in ds:
                 out = standardise_sic(ds[name])
                 out.name = "sic"
@@ -48,8 +47,12 @@ class NSIDCReader:
     def total_sia_sie(self) -> xr.Dataset:
         return compute_sia_sie(self.sic(), self.open_area(), threshold=self.config.sic_threshold)
 
-    def sic_month_and_climatology(self, *, year: int, month: int) -> xr.Dataset:
+    def sic_month_and_climatology(self, *, year: int, month: int, fallback_latest: bool = True) -> xr.Dataset:
         sic = self.sic()
+        requested_year, requested_month = int(year), int(month)
+        exact = True
+        if fallback_latest:
+            year, month, exact = resolve_year_month(sic, requested_year, requested_month)
         clim = monthly_climatology(
             sic,
             start_year=self.config.climatology_start,
@@ -59,12 +62,16 @@ class NSIDCReader:
         clim_field = clim.sel(month=month)
         anom = month_field - clim_field
         anom.name = "sic_anom"
-        anom.attrs.update({
-            "long_name": "sea ice concentration anomaly",
-            "units": "1",
-            "year": year,
-            "month": month,
+        common_attrs = {
+            "requested_year": requested_year,
+            "requested_month": requested_month,
+            "selected_year": int(year),
+            "selected_month": int(month),
+            "exact_requested_month": bool(exact),
             "climatology_start": self.config.climatology_start,
             "climatology_end": self.config.climatology_end,
-        })
-        return xr.Dataset({"sic": month_field, "sic_clim": clim_field, "sic_anom": anom})
+        }
+        anom.attrs.update({"long_name": "sea ice concentration anomaly", "units": "1", **common_attrs})
+        month_field.attrs.update(common_attrs)
+        clim_field.attrs.update(common_attrs)
+        return xr.Dataset({"sic": month_field, "sic_clim": clim_field, "sic_anom": anom}, attrs=common_attrs)

@@ -10,6 +10,13 @@ from .pygmt_base import require_pygmt, south_polar_projection, south_polar_regio
 from .palettes import make_symmetric_cpt
 
 
+def _selected_ym_from_attrs(obj: xr.Dataset | xr.DataArray, fallback_year: int | None = None, fallback_month: int | None = None) -> tuple[int | None, int | None]:
+    attrs = obj.attrs
+    y = attrs.get("selected_year", fallback_year)
+    m = attrs.get("selected_month", fallback_month)
+    return (int(y) if y is not None else None, int(m) if m is not None else None)
+
+
 @dataclass
 class MonthlySeaIceChatPlotter:
     """PyGMT-first plotting helpers for the monthly sea-ice science-chat figures."""
@@ -36,17 +43,18 @@ class MonthlySeaIceChatPlotter:
         output.parent.mkdir(parents=True, exist_ok=True)
         region = south_polar_region(self.config.latmax_sh)
         projection = south_polar_projection("16c")
-        title = title or f"NSIDC SIC anomaly, {year:04d}-{month:02d}"
+        sy, sm = _selected_ym_from_attrs(ds, year, month)
+        suffix = "" if ds.attrs.get("exact_requested_month", True) else f" (latest available; requested {year:04d}-{month:02d})"
+        title = title or f"NSIDC SIC anomaly, {sy:04d}-{sm:02d}{suffix}"
 
         anom = ds["sic_anom"].squeeze()
         cpt_path = output.with_suffix(".sic_anom.cpt")
         make_symmetric_cpt(pygmt, cmap="polar", limit=1.0, output=cpt_path, series_step=0.1)
 
         try:
-            # Works for regular lon/lat grids and some projected grids with georeference metadata.
             fig.grdimage(anom, region=region, projection=projection, cmap=str(cpt_path), frame=["afg", f"+t{title}"])
+            fig.coast(shorelines="0.25p,black", land="gray80")
         except Exception:
-            # Curvilinear/2-D lon-lat fallback. Slower but robust for NSIDC-style products.
             xyz = output.with_suffix(".xyz")
             write_xyz_from_curvilinear(anom, xyz, stride=stride)
             fig.coast(region=region, projection=projection, land="gray80", water="white", shorelines="0.25p,black", frame=["afg", f"+t{title}"])
@@ -76,13 +84,16 @@ class MonthlySeaIceChatPlotter:
         if df.empty:
             raise ValueError("No SIA/SIE values available for plotting.")
         df["year"] = pd.to_datetime(df["time"]).dt.year + (pd.to_datetime(df["time"]).dt.month - 0.5) / 12.0
-        ymin = float(df[[c for c in ("SIA", "SIE") if c in df]].min().min())
-        ymax = float(df[[c for c in ("SIA", "SIE") if c in df]].max().max())
+        cols = [c for c in ("SIA", "SIE") if c in df]
+        ymin = float(df[cols].min().min())
+        ymax = float(df[cols].max().max())
         xmin = float(df["year"].min())
         xmax = float(df["year"].max())
         pad = max((ymax - ymin) * 0.08, 0.25)
         region = [xmin, xmax, max(0, ymin - pad), ymax + pad]
-        fig.basemap(region=region, projection="X18c/9c", frame=["WSen", "xaf+lYear", "yaf+l10@+6@+ km@+2@+", f"+t{title}"])
+        # GMT expects frame side codes in the canonical order used by PyGMT docs.
+        # WSen is rejected by some GMT builds; WSne is robust.
+        fig.basemap(region=region, projection="X18c/9c", frame=["WSne", "xaf+lYear", "yaf+l10@+6@+ km@+2@+", f"+t{title}"])
         if "SIA" in df:
             fig.plot(x=df["year"], y=df["SIA"], pen="1.2p,black", label="SIA")
         if "SIE" in df:
@@ -103,7 +114,7 @@ class MonthlySeaIceChatPlotter:
         projection_width: str = "16c",
         stride: int = 1,
     ) -> Path:
-        """Generic PyGMT gridded anomaly map."""
+        """Generic PyGMT gridded anomaly/field map."""
         pygmt, fig = self._figure()
         output = Path(output)
         output.parent.mkdir(parents=True, exist_ok=True)

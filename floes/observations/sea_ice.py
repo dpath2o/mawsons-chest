@@ -1,14 +1,50 @@
 from __future__ import annotations
 
+from calendar import monthrange
 import numpy as np
+import pandas as pd
 import xarray as xr
+
+_TIME_NAMES = ("time", "valid_time", "date", "time_counter", "t")
+
+
+def find_time_name(obj: xr.Dataset | xr.DataArray) -> str:
+    """Return the best available time dimension/coordinate name.
+
+    The observational holdings on Gadi are not perfectly CF-homogeneous. ERA5
+    files commonly expose ``valid_time`` or ``date`` while NSIDC/OISST generally
+    use ``time``. This helper keeps all downstream monthly selection code from
+    assuming a single spelling.
+    """
+    for name in _TIME_NAMES:
+        if name in obj.dims:
+            return name
+    for name in _TIME_NAMES:
+        if name in obj.coords:
+            return name
+    raise ValueError(f"Could not infer a time coordinate from dims={obj.dims} coords={list(obj.coords)}")
+
+
+def ensure_time_dim(obj: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
+    """Return ``obj`` with the primary time dimension named ``time``."""
+    name = find_time_name(obj)
+    out = obj
+    if name != "time" and name in out.dims:
+        out = out.rename({name: "time"})
+    elif name != "time" and name in out.coords and "time" not in out.coords:
+        out = out.rename({name: "time"})
+    if "time" in out.coords:
+        try:
+            out = out.assign_coords(time=pd.to_datetime(out["time"].values))
+        except Exception:
+            pass
+    return out
 
 
 def standardise_sic(sic: xr.DataArray) -> xr.DataArray:
     """Return sea-ice concentration as fraction [0, 1] with invalid flags masked."""
-    out = sic.astype("float32")
-    # NSIDC CDR products are usually 0..1 after xarray scale/offset decoding;
-    # if a percent product is encountered, convert defensively.
+    out = ensure_time_dim(sic) if any(n in sic.dims or n in sic.coords for n in _TIME_NAMES) else sic
+    out = out.astype("float32")
     units = str(out.attrs.get("units", "")).lower()
     valid_max = out.attrs.get("valid_max", out.attrs.get("actual_range", None))
     looks_percent = "%" in units or "percent" in units
@@ -33,28 +69,16 @@ def compute_sia_sie(
     threshold: float = 0.15,
     spatial_dims: tuple[str, str] | None = None,
 ) -> xr.Dataset:
-    """Compute sea-ice area and extent time series.
-
-    Parameters
-    ----------
-    sic
-        Sea-ice concentration fraction [0, 1].
-    area
-        Grid-cell area in square metres or already in million km2. If an xarray
-        DataArray has units mentioning ``m2`` or ``m^2``, it is converted to
-        million km2.
-    threshold
-        Concentration threshold for extent.
-    spatial_dims
-        Optional explicit spatial dimensions. If omitted, all non-time dimensions
-        are summed.
-    """
+    """Compute sea-ice area and extent time series in 10^6 km^2."""
     sic = standardise_sic(sic)
     if isinstance(area, xr.DataArray):
         units = str(area.attrs.get("units", "")).lower()
-        area_mkm2 = area.astype("float64") * 1.0e-12 if ("m2" in units or "m^2" in units or float(area.max()) > 10_000) else area
+        try:
+            large = float(area.max(skipna=True)) > 10_000
+        except Exception:
+            large = True
+        area_mkm2 = area.astype("float64") * 1.0e-12 if ("m2" in units or "m^2" in units or large) else area
     else:
-        # Numeric fallback: assume square metres if large, million km2 if small.
         area_mkm2 = area * 1.0e-12 if area > 10_000 else area
 
     if spatial_dims is None:
@@ -73,6 +97,7 @@ def compute_sia_sie(
 
 def monthly_climatology(da: xr.DataArray, *, start_year: int, end_year: int) -> xr.DataArray:
     """Return month-of-year climatology over an inclusive year window."""
+    da = ensure_time_dim(da)
     clim = da.sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31")).groupby("time.month").mean("time", skipna=True)
     clim.attrs.update(da.attrs)
     clim.attrs["climatology_start"] = start_year
@@ -82,6 +107,7 @@ def monthly_climatology(da: xr.DataArray, *, start_year: int, end_year: int) -> 
 
 def monthly_anomaly(da: xr.DataArray, clim: xr.DataArray) -> xr.DataArray:
     """Return monthly anomalies using a month-of-year climatology."""
+    da = ensure_time_dim(da)
     anom = da.groupby("time.month") - clim
     anom.name = f"{da.name or 'field'}_anom"
     anom.attrs.update(da.attrs)
@@ -89,11 +115,54 @@ def monthly_anomaly(da: xr.DataArray, clim: xr.DataArray) -> xr.DataArray:
     return anom
 
 
+def available_year_months(da: xr.DataArray) -> list[tuple[int, int]]:
+    """Return sorted unique (year, month) pairs present in a DataArray."""
+    da = ensure_time_dim(da)
+    if "time" not in da.coords or da.sizes.get("time", 0) == 0:
+        return []
+    t = pd.to_datetime(da["time"].values)
+    pairs = sorted({(int(v.year), int(v.month)) for v in t if not pd.isna(v)})
+    return pairs
+
+
+def resolve_year_month(
+    da: xr.DataArray,
+    year: int,
+    month: int,
+    *,
+    prefer_lte: bool = True,
+) -> tuple[int, int, bool]:
+    """Resolve a requested month to an available month.
+
+    Returns ``(year, month, exact_match)``. If the requested month is missing,
+    the default behaviour is to fall back to the latest available month not later
+    than the request. This is essential for the monthly chat workflow because the
+    current calendar month and the latest archived observational product often do
+    not line up.
+    """
+    pairs = available_year_months(da)
+    if not pairs:
+        raise ValueError("No valid time records are available in this product.")
+    requested = (int(year), int(month))
+    if requested in pairs:
+        return requested[0], requested[1], True
+    candidates = [p for p in pairs if p <= requested] if prefer_lte else []
+    if not candidates:
+        candidates = pairs
+    y, m = max(candidates)
+    return y, m, False
+
+
 def select_year_month(da: xr.DataArray, year: int, month: int) -> xr.DataArray:
-    target = da.sel(time=slice(f"{year:04d}-{month:02d}-01", f"{year:04d}-{month:02d}-28"))
+    """Select and average one calendar month from a DataArray."""
+    da = ensure_time_dim(da)
+    last_day = monthrange(int(year), int(month))[1]
+    target = da.sel(time=slice(f"{year:04d}-{month:02d}-01", f"{year:04d}-{month:02d}-{last_day:02d}"))
     if target.sizes.get("time", 0) == 0:
-        # calendar-safe broad fallback
         target = da.where((da["time"].dt.year == year) & (da["time"].dt.month == month), drop=True)
     if target.sizes.get("time", 0) == 0:
         raise ValueError(f"No data found for {year:04d}-{month:02d}")
-    return target.mean("time", skipna=True)
+    out = target.mean("time", skipna=True)
+    out.attrs["selected_year"] = int(year)
+    out.attrs["selected_month"] = int(month)
+    return out

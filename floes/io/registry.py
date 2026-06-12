@@ -7,11 +7,7 @@ from typing import Mapping
 
 @dataclass(frozen=True)
 class DataProduct:
-    """Description of a known local/remote data product.
-
-    The registry is intentionally declarative so source paths, variable names,
-    and download hints are not duplicated across scripts.
-    """
+    """Description of a known local/remote data product."""
 
     key: str
     title: str
@@ -35,6 +31,7 @@ KNOWN_PRODUCTS: dict[str, DataProduct] = {
         title="NSIDC CDR monthly sea-ice concentration, Southern Hemisphere",
         local_patterns=(
             "NSIDC/monthly_sic/sic_pss25_*_v*.nc",
+            "NSIDC/monthly_sic/*pss25*.nc",
             "NSIDC/G02202_V*/south/aggregate/sic_pss25_??????-??????_v*.nc",
         ),
         primary_variable="cdr_seaice_conc_monthly",
@@ -49,21 +46,11 @@ KNOWN_PRODUCTS: dict[str, DataProduct] = {
         title="NSIDC polar stereographic 25 km Southern Hemisphere cell area",
         local_patterns=(
             "NSIDC/NSIDC0771_CellArea_PS_S25km_v1.0.nc",
+            "NSIDC/**/*CellArea*PS*S25km*.nc",
             "NSIDC/G02202_V*/south/ancillary/*pss25*ancillary*.nc",
         ),
         primary_variable="cell_area",
         notes="Cell area in m2; convert to 10^6 km2 by multiplying by 1e-12.",
-    ),
-    "osisaf_total_sia": DataProduct(
-        key="osisaf_total_sia",
-        title="OSI SAF total sea-ice area/extent time series",
-        local_patterns=(
-            "OSISAF/**/*SIA*.nc",
-            "OSI-SAF/**/*SIA*.nc",
-            "OSISAF/**/*area*.nc",
-        ),
-        download_family="osisaf",
-        notes="Discovery-only scaffold; exact operational path should be pinned after Gadi inspection.",
     ),
     "oisst_monthly": DataProduct(
         key="oisst_monthly",
@@ -71,6 +58,7 @@ KNOWN_PRODUCTS: dict[str, DataProduct] = {
         local_patterns=(
             "OISST/**/*.nc",
             "OISST/monthly/**/*.nc",
+            "OISST/**/*sst*.nc",
         ),
         primary_variable="sst",
         lon_name="lon",
@@ -83,14 +71,20 @@ KNOWN_PRODUCTS: dict[str, DataProduct] = {
         local_patterns=(
             "ERA5/**/*.nc",
             "ERA5/monthly/**/*.nc",
+            "ERA5/**/*wind*.nc",
+            "ERA5/**/*windspeed*.nc",
         ),
         download_family="era5",
-        notes="Used for wind/SIE and surface-flux figures; not downloaded by default.",
+        notes="Used for wind/SIE and surface-field figures; not downloaded by default.",
     ),
     "oras5_thetao_monthly": DataProduct(
         key="oras5_thetao_monthly",
         title="ORAS5 monthly potential temperature",
-        local_patterns=("ORAS5/thetao/ORAS5_thetao_monthly_SOcean_*.nc",),
+        local_patterns=(
+            "ORAS5/thetao/ORAS5_thetao_monthly_SOcean_*.nc",
+            "ORAS5/thetao/ORAS5*_thetao_monthly*.nc",
+            "ORAS5/thetao/*thetao*monthly*.nc",
+        ),
         primary_variable="thetao",
         lon_name="nav_lon",
         lat_name="nav_lat",
@@ -99,7 +93,11 @@ KNOWN_PRODUCTS: dict[str, DataProduct] = {
     "oras5_vosaline_monthly": DataProduct(
         key="oras5_vosaline_monthly",
         title="ORAS5 monthly salinity",
-        local_patterns=("ORAS5/vosaline/ORAS5_vosaline_monthly_SOcean_*.nc",),
+        local_patterns=(
+            "ORAS5/vosaline/ORAS5_vosaline_monthly_SOcean_*.nc",
+            "ORAS5/vosaline/ORAS5*_vosaline_monthly*.nc",
+            "ORAS5/vosaline/*vosaline*monthly*.nc",
+        ),
         primary_variable="vosaline",
         lon_name="nav_lon",
         lat_name="nav_lat",

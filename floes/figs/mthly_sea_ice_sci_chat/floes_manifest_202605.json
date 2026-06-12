@@ -1,25 +1,25 @@
 {
-  "year": 2026,
-  "month": 5,
+  "requested_year": 2026,
+  "requested_month": 5,
   "gadi_base": "/g/data/gv90/wrh581",
   "figure_root": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat",
   "gallery": "/g/data/gv90/da1339/src/mawsons-chest/floes/docs/mthly_sea_ice_sci_chat_figs.md",
   "steps": {
     "NSIDC SIC anomaly map": {
-      "status": "skipped_or_failed",
-      "error": "ValueError('No data found for 2026-05')"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202604.png"
     },
     "NSIDC total SIA/SIE time series": {
       "status": "skipped_or_failed",
-      "error": "GMTCLibError(\"Module 'basemap' failed with status code 72:\\nbasemap [ERROR]: Option -B parsing failure. Correct syntax:\\nbasemap [ERROR]: Offending option -BWSen\")"
+      "error": "GMTCLibError(\"Module 'basemap' failed with status code 72:\\nbasemap [ERROR]: Option -B parsing failure. Correct syntax:\\nbasemap [ERROR]: Offending option -BWSne\")"
     },
     "OISST SST anomaly map": {
-      "status": "skipped_or_failed",
-      "error": "ValueError('No data found for 2026-05')"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/OISST_global_sst_anomaly_202604.png"
     },
     "ERA5 wind map": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"Could not find 'u10'/'v10' in ERA5 dataset: ['date', 'msl', 'slhf', 'ssr', 'str', 'sshf', 'avg_iews', 'avg_inss', 'mean_windspeed', 'max_windspeed', 'sd_windspeed', 'quartiles']\")"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202512.png"
     },
     "ORAS5 depth-time diagnostic": {
       "status": "skipped_or_failed",
