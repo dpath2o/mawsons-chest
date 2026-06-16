@@ -16,7 +16,8 @@
 
 - Brief catch-up and any updates carried over from previous meetings.
 - I suck ... I failed at generating the figures in [Will's repository](https://github.com/willrhobbs/Obs-seaice-analysis/tree/main)
-- state of the ice, a few useful figures, current science items
+- NIL updates in [COSIMA: Sea Ice](https://forum.access-hive.org.au/c/cosima/sea-ice/31)
+- state of the sea ice, figure chat, current science items
 
 ## 2. `floes` repository status — exists, but very much work in progress
 
