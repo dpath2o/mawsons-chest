@@ -10,7 +10,7 @@
 - Added PBS entry point: `update_mthly_sea_ice_sci_chat_figs.pbs`.
 - Added markdown gallery: `docs/mthly_sea_ice_sci_chat_figs.md`.
 
-## 0.1.1 - first Gadi smoke-test fixes
+## 0.1.1 - first Gadi fixes
 
 - Fall back to the latest available month when the requested month is not present in local holdings.
 - Fix PyGMT/GMT basemap frame syntax from `WSen` to `WSne`.

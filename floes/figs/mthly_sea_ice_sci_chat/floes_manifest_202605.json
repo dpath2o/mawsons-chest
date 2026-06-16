@@ -7,7 +7,7 @@
   "steps": {
     "NSIDC SIC anomaly map": {
       "status": "ok",
-      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202604.png"
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202605.png"
     },
     "NSIDC total SIA/SIE time series": {
       "status": "skipped_or_failed",

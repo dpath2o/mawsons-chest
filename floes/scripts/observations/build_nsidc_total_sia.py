@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-
 import argparse
 from pathlib import Path
 import sys
-
 THIS = Path(__file__).resolve()
 FLOES_ROOT = THIS.parents[2]
 PARENT = FLOES_ROOT.parent
 if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
-
 from floes.config import default_config  # noqa: E402
 from floes.observations.nsidc import NSIDCReader  # noqa: E402
-
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Build NSIDC total SIA/SIE NetCDF from local monthly SIC files.")
@@ -28,7 +24,6 @@ def main() -> int:
     ds.to_netcdf(args.output)
     print(f"Wrote {args.output}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

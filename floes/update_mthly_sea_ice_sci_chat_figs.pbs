@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -P gv90
+#PBS -P jk72
 #PBS -q normal
 #PBS -l walltime=02:00:00
 #PBS -l ncpus=8
@@ -33,11 +33,7 @@ FLOES_GADI_BASE="${FLOES_GADI_BASE:-/g/data/gv90/wrh581}"
 export OMP_NUM_THREADS=1
 export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
 
-ARGS=(
-    --project "$PROJECT"
-    --user "$GADI_USER"
-    --gadi-base "$FLOES_GADI_BASE"
-)
+ARGS=(--project "$PROJECT" --user "$GADI_USER" --gadi-base "$FLOES_GADI_BASE")
 
 if [[ -n "${FLOES_YEAR:-}" ]]; then
     ARGS+=(--year "$FLOES_YEAR")

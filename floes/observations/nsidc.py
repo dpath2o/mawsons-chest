@@ -1,18 +1,14 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 import xarray as xr
-
 from floes.config import FloesConfig
 from floes.io.gadi import find_product_files, open_product
 from .sea_ice import compute_sia_sie, monthly_climatology, resolve_year_month, select_year_month, standardise_sic
 
-
 @dataclass
 class NSIDCReader:
     """Reader/processor for NSIDC CDR sea-ice concentration products."""
-
     config: FloesConfig
     product_key: str = "nsidc_cdr_sic_monthly_sh"
     area_key: str = "nsidc_cell_area_sh"
@@ -53,24 +49,18 @@ class NSIDCReader:
         exact = True
         if fallback_latest:
             year, month, exact = resolve_year_month(sic, requested_year, requested_month)
-        clim = monthly_climatology(
-            sic,
-            start_year=self.config.climatology_start,
-            end_year=self.config.climatology_end,
-        )
+        clim = monthly_climatology(sic, start_year = self.config.climatology_start, end_year = self.config.climatology_end)
         month_field = select_year_month(sic, year, month)
         clim_field = clim.sel(month=month)
         anom = month_field - clim_field
         anom.name = "sic_anom"
-        common_attrs = {
-            "requested_year": requested_year,
-            "requested_month": requested_month,
-            "selected_year": int(year),
-            "selected_month": int(month),
-            "exact_requested_month": bool(exact),
-            "climatology_start": self.config.climatology_start,
-            "climatology_end": self.config.climatology_end,
-        }
+        common_attrs = {"requested_year": requested_year,
+                        "requested_month": requested_month,
+                        "selected_year": int(year),
+                        "selected_month": int(month),
+                        "exact_requested_month": bool(exact),
+                        "climatology_start": self.config.climatology_start,
+                        "climatology_end": self.config.climatology_end}
         anom.attrs.update({"long_name": "sea ice concentration anomaly", "units": "1", **common_attrs})
         month_field.attrs.update(common_attrs)
         clim_field.attrs.update(common_attrs)

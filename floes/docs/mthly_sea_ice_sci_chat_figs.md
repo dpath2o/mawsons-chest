@@ -1,6 +1,6 @@
 # Monthly Sea Ice Science Chat Figures
 
-Last refreshed: 2026-06-07T15:02:11
+Last refreshed: 2026-06-16T07:42:04
 
 Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat`
 
@@ -11,6 +11,10 @@ Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ic
 ## NSIDC SH sic anomaly 202604
 
 ![NSIDC SH sic anomaly 202604](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202604.png)
+
+## NSIDC SH sic anomaly 202605
+
+![NSIDC SH sic anomaly 202605](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202605.png)
 
 ## OISST global sst anomaly 202604
 
