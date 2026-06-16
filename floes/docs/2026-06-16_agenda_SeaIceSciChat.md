@@ -15,59 +15,72 @@
 ## 1. Quick check-in / previous meeting flow
 
 - Brief catch-up and any updates carried over from previous meetings.
-- I suck ... I failed at generating the figures in [Will's repository](https://github.com/willrhobbs/Obs-seaice-analysis/tree/main)
+- I suck. Will does not! ... I failed at generating the figures in [Will's repository](https://github.com/willrhobbs/Obs-seaice-analysis/tree/main), but fortunately Will was available to do this at short notice this morning
 - NIL updates in [COSIMA: Sea Ice](https://forum.access-hive.org.au/c/cosima/sea-ice/31)
 - state of the sea ice, figure chat, current science items
 
-## 2. `floes` repository status — exists, but very much work in progress
+## 2. Discussion figures — current Antarctic sea-ice context
+
+### 2.1 Will's updated plots
+
+- [NSIDC_SIA_cdr_monthly_tplot.000001.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/NSIDC_SIA_cdr_monthly_tplot.000001.png)
+- [NSIDC_SIA_cdr_monthly_tplot.000002.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/NSIDC_SIA_cdr_monthly_tplot.000002.png)
+- [NSIDC_sic_ERA5_psl_map_202302-202605_ani.gif](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/NSIDC_sic_ERA5_psl_map_202302-202605_ani.gif)
+- [NSIDC_sic_OISSTv2_sst_map_202302-202605_ani.gif](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/NSIDC_sic_OISSTv2_sst_map_202302-202605_ani.gif)
+- [OISSTv2_sst_anom_SO_timeseries.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/OISSTv2_sst_anom_SO_timeseries.png)
+- [ORAS5_Bellingshausen_depth-time_sector_mean_anoms.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/ORAS5_Bellingshausen_depth-time_sector_mean_anoms.png)
+- [ORAS5_Circumpolar_depth-time_sector_mean_anoms.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/ORAS5_Circumpolar_depth-time_sector_mean_anoms.png)
+- [ORAS5_E. Antarctic_depth-time_sector_mean_anoms.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/ORAS5_E.%20Antarctic_depth-time_sector_mean_anoms.png)
+- [ORAS5_King Haakon_depth-time_sector_mean_anoms.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/ORAS5_King%20Haakon_depth-time_sector_mean_anoms.png)
+- [ORAS5_Weddell_depth-time_sector_mean_anoms.png](https://github.com/willrhobbs/Obs-seaice-analysis/blob/main/plots/ORAS5_Weddell_depth-time_sector_mean_anoms.png)
+
+Discussion prompts:
+
+- What is the clearest "first figure" for a regular Antarctic sea-ice update: SIA/SIE time series, anomaly, or spatial SIC + atmospheric/ocean overlay?
+- What is the current Bellingshausen/West Antarctic signal in the updated figures?
+- Do the ORAS5 depth-time anomaly plots help explain the recent sea-ice state, or are they better kept as supporting context?
+
+### 2.2 Climate Plots reference figures
+
+Useful external reference pages:
+
+- Antarctic sea ice extent: https://climate-plots.github.io/projects/Antarctic_SIE/
+- Southern Annular Mode: https://climate-plots.github.io/projects/SAM/
+- Global SST page: https://climate-plots.github.io/projects/SST/
+>Note: the Climate Plots SST page is currently marked as not being updated because of NOAA server issues.
+
+Selected Antarctic SIE figures:
+
+- [Antarctic sea ice extent by year](https://climate-plots.github.io/assets/img/Ant_SIE_by_year.png)
+- [Antarctic sea ice extent anomaly](https://climate-plots.github.io/assets/img/Ant_SIE_anom.png)
+- [Antarctic seasonal anomaly by year](https://climate-plots.github.io/assets/img/Ant_SIE_year_anoms.png)
+- [Standardised seasonal anomaly by year](https://climate-plots.github.io/assets/img/Ant_SIE_year_anoms_standardised.png)
+- [Climatology](https://climate-plots.github.io/assets/img/Ant_SIE_climatology.png)
+
+Discussion prompts:
+
+- Where is 2026 sitting relative to the post-2016 low-ice regime?
+- Do we want a standard "first figure" for Antarctic SIE?
+- Is SAM useful as a regular contextual figure?
+
+## 3. `floes` repository status — exists, but very much work in progress
 
 - Repository/docs location for now: https://github.com/dpath2o/mawsons-chest/tree/main/floes/docs
 - The `floes` repository/documentation space now exists, but it is nowhere near finished.
 - Current status:
   - skeleton framework
 - Future work:
-  - build out comprehensive sea ice observation(ish) dataset ... ???
-    - gather a comprehensive list of publiclly available and accessible observational (including remote sensing) and reanalysis datasets
-      - separate datasets into modelled/reanalysis from point-observations and remotely sense(d) products
-      - gridded from un-gridded
-  - create/allocate space on `/g/data/gv90` sub-directory for this dataset to exist (?)
-  - revise download scripts in `floes` to download/update dataset repository
-  - 'universalise' (:slightly_smiling_face:) [Will's NCL plots](https://github.com/willrhobbs/Obs-seaice-analysis/tree/main) to work off of the above dataset repository (?)
-    - I see this still being python backbone but the `subprocess` or `sys` calls to NCL
-  - continue to develop PyGMT workflow for `floes` as an alternate figure space as alternate exceptional figure generator 
+  - build out a comprehensive sea-ice observation/reanalysis dataset space
+    - gather a comprehensive list of publicly available and accessible observational, remote-sensing, and reanalysis datasets
+    - separate modelled/reanalysis products from point observations and remotely sensed products
+    - separate gridded from ungridded products
+  - create/allocate space on `/g/data/gv90` for this dataset to exist (?)
+  - revise download scripts in `floes` to download/update the dataset repository
+  - "universalise" (:slightly_smiling_face:) [Will's NCL plots](https://github.com/willrhobbs/Obs-seaice-analysis/tree/main) to work from the above dataset repository (?)
+    - perhaps still a Python backbone, with `subprocess` or `sys` calls to NCL where needed
+  - continue developing a PyGMT workflow for `floes` as an alternate figure-generation space
 - Next meeting:
-  - Do we want to use `floes/docs` as a lightweight place for meeting notes, figure links, workflow notes, etc.
-
-## 3. Discussion figures — current Antarctic sea-ice context
-
-Use these as prompts rather than polished diagnostics.
-
-### 3.1 Antarctic sea ice extent
-
-- Project page: https://climate-plots.github.io/projects/Antarctic_SIE/
-- Figure options:
-  - Antarctic sea ice extent by year: https://climate-plots.github.io/assets/img/Ant_SIE_by_year.png
-  - Antarctic sea ice extent anomaly: https://climate-plots.github.io/assets/img/Ant_SIE_anom.png
-  - Antarctic seasonal anomaly by year: https://climate-plots.github.io/assets/img/Ant_SIE_year_anoms.png
-  - Standardised seasonal anomaly by year: https://climate-plots.github.io/assets/img/Ant_SIE_year_anoms_standardised.png
-  - Climatology: https://climate-plots.github.io/assets/img/Ant_SIE_climatology.png
-
-Discussion prompts:
-
-- Where is 2026 sitting relative to the post-2016 low-ice regime?
-- Does we want a a standard "first figure" for Antarctic SIE?
-- Which figure is most useful for a quick update: absolute extent, anomaly, or standardised anomaly?
-
-### 3.2 Atmospheric/ocean context
-
-- Southern Annular Mode: https://climate-plots.github.io/projects/SAM/
-- Global SST page: https://climate-plots.github.io/projects/SST/
-  - Note: the Climate Plots SST page is currently marked as not being updated because of NOAA server issues.
-
-Discussion prompts:
-
-- Is SAM useful as a regular contextual figure, or only when it is dynamically relevant?
-- What should we use for Southern Ocean SST / surface forcing context if the SST page is not updating?
+  - Do we want to use `floes/docs` as a lightweight place for meeting notes, figure links, workflow notes, and known issues?
 
 ## 4. Recent Scientific Publications:
 
