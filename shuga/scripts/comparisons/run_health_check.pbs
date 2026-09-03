@@ -1,0 +1,76 @@
+#!/bin/bash
+#PBS -P jk72
+#PBS -q normalbw
+#PBS -l walltime=06:00:00
+#PBS -l ncpus=24
+#PBS -l mem=190GB
+#PBS -l jobfs=10GB
+#PBS -j oe
+#PBS -l storage=gdata/xp65+gdata/gv90+gdata/ik11+scratch/jk72+scratch/gv90
+
+set -euo pipefail
+
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3-26.02
+
+RUN_NAME="${RUN_NAME:?RUN_NAME not set}"
+REFERENCE_SIM="${REFERENCE_SIM:-Cs-high}"
+PROJECT="${PROJECT:-gv90}"
+RUN_USER="${RUN_USER:-da1339}"
+AFIM_OUTPUT_ROOT="${AFIM_OUTPUT_ROOT:-/g/data/${PROJECT}/${RUN_USER}/afim_output}"
+HISTORY_ROOT="${HISTORY_ROOT:-/g/data/${PROJECT}/${RUN_USER}/cice-dirs/runs/${RUN_NAME}/history}"
+REFERENCE_ROOT="${REFERENCE_ROOT:-${AFIM_OUTPUT_ROOT}/${REFERENCE_SIM}}"
+STATIC_STORE="${STATIC_STORE:-${AFIM_OUTPUT_ROOT}/CICE_0p25_Cgrid_coords.zarr}"
+START_DATE="${START_DATE:-}"
+END_DATE="${END_DATE:-}"
+FI_METHOD="${FI_METHOD:-binary-days}"
+GRID_TYPE="${GRID_TYPE:-Tc}"
+ISPD_THRESH="${ISPD_THRESH:-5e-4}"
+BIN_WINDOW="${BIN_WINDOW:-11}"
+BIN_MIN_DAYS="${BIN_MIN_DAYS:-9}"
+ROLL_WINDOW="${ROLL_WINDOW:-15}"
+ICE_THRESHOLD="${ICE_THRESHOLD:-0.15}"
+FINAL_WINDOW="${FINAL_WINDOW:-14}"
+OVERWRITE_CANDIDATE_HISTORY="${OVERWRITE_CANDIDATE_HISTORY:-false}"
+OVERWRITE_CANDIDATE_CLASSIFICATION="${OVERWRITE_CANDIDATE_CLASSIFICATION:-false}"
+OVERWRITE_CANDIDATE_METRICS="${OVERWRITE_CANDIDATE_METRICS:-false}"
+SKIP_CANDIDATE_PROCESSING="${SKIP_CANDIDATE_PROCESSING:-false}"
+OUTDIR="${OUTDIR:-}"
+
+REPO_ROOT="${REPO_ROOT:-$HOME/AFIM/src/mawsons-chest}"
+PY_SCRIPT="${PY_SCRIPT:-${REPO_ROOT}/shuga/scripts/comparisons/run_health_check.py}"
+
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+export DASK_TEMPORARY_DIRECTORY="/scratch/${PROJECT}/${RUN_USER}/dask_tmp/${PBS_JOBID}"
+export TMPDIR="/scratch/${PROJECT}/${RUN_USER}/tmp/${PBS_JOBID}"
+mkdir -p "$DASK_TEMPORARY_DIRECTORY" "$TMPDIR"
+
+CMD=(python "$PY_SCRIPT"
+     --run-name "$RUN_NAME"
+     --history-root "$HISTORY_ROOT"
+     --reference-sim "$REFERENCE_SIM"
+     --reference-root "$REFERENCE_ROOT"
+     --afim-output-root "$AFIM_OUTPUT_ROOT"
+     --project "$PROJECT"
+     --user "$RUN_USER"
+     --fi-method "$FI_METHOD"
+     --grid-type "$GRID_TYPE"
+     --ispd-thresh "$ISPD_THRESH"
+     --bin-window "$BIN_WINDOW"
+     --bin-min-days "$BIN_MIN_DAYS"
+     --roll-window "$ROLL_WINDOW"
+     --ice-threshold "$ICE_THRESHOLD"
+     --final-window "$FINAL_WINDOW")
+
+[[ -n "$STATIC_STORE" ]] && CMD+=(--static-store "$STATIC_STORE")
+[[ -n "$START_DATE" ]] && CMD+=(--start-date "$START_DATE")
+[[ -n "$END_DATE" ]] && CMD+=(--end-date "$END_DATE")
+[[ -n "$OUTDIR" ]] && CMD+=(--outdir "$OUTDIR")
+[[ "$OVERWRITE_CANDIDATE_HISTORY" == "true" ]] && CMD+=(--overwrite-candidate-history)
+[[ "$OVERWRITE_CANDIDATE_CLASSIFICATION" == "true" ]] && CMD+=(--overwrite-candidate-classification)
+[[ "$OVERWRITE_CANDIDATE_METRICS" == "true" ]] && CMD+=(--overwrite-candidate-metrics)
+[[ "$SKIP_CANDIDATE_PROCESSING" == "true" ]] && CMD+=(--skip-candidate-processing)
+
+echo "Running: ${CMD[*]}"
+"${CMD[@]}"
