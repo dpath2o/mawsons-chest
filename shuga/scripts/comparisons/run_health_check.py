@@ -24,58 +24,48 @@ is especially important for experiments that deliberately start from zero sea
 ice and are expected to recover toward a spun-up state.
 """
 from __future__ import annotations
-
 import argparse
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-
 from shuga import ClassificationSpec, RunSpec, ShugaPaths, load_cice, load_metrics  # noqa: E402
 
-DATE_RE = re.compile(r"^iceh\.(\d{4}-\d{2}-\d{2})\.nc$")
-CORE_SI = ("SIA", "SIT", "SIS")
-CORE_FI = ("FIA", "FIT", "FIS")
-PLOT_ORDER = ("SIC", "SIA", "SIE", "SIT", "SIS", "FIA", "FIT", "FIS")
-PLOT_LABELS = {
-    "SIC": "Mean SIC over 15% extent",
-    "SIA": "Sea-ice area",
-    "SIE": "Sea-ice extent",
-    "SIT": "Sea-ice thickness",
-    "SIS": "Sea-ice strength",
-    "FIA": "Fast-ice area",
-    "FIT": "Fast-ice thickness",
-    "FIS": "Fast-ice strength",
-}
-DISPLAY_UNITS = {
-    "SIC": "%",
-    "SIA": "10$^6$ km$^2$",
-    "SIE": "10$^6$ km$^2$",
-    "SIT": "m",
-    "SIS": "MPa",
-    "FIA": "10$^6$ km$^2$",
-    "FIT": "m",
-    "FIS": "MPa",
-}
-
+DATE_RE     = re.compile(r"^iceh\.(\d{4}-\d{2}-\d{2})\.nc$")
+CORE_SI     = ("SIA", "SIT", "SIS")
+CORE_FI     = ("FIA", "FIT", "FIS")
+PLOT_ORDER  = ("SIC", "SIA", "SIE", "SIT", "SIS", "FIA", "FIT", "FIS")
+PLOT_LABELS = {"SIC": "Mean SIC over 15% extent",
+               "SIA": "Sea-ice area",
+               "SIE": "Sea-ice extent",
+               "SIT": "Sea-ice thickness",
+               "SIS": "Sea-ice strength",
+               "FIA": "Fast-ice area",
+               "FIT": "Fast-ice thickness",
+               "FIS": "Fast-ice strength"}
+DISPLAY_UNITS = {"SIC": "%",
+                 "SIA": "10$^6$ km$^2$",
+                 "SIE": "10$^6$ km$^2$",
+                 "SIT": "m",
+                 "SIS": "MPa",
+                 "FIA": "10$^6$ km$^2$",
+                 "FIT": "m",
+                 "FIS": "MPa"}
 
 @dataclass(frozen=True)
 class SourceFileState:
     size: int
     mtime_ns: int
-
 
 @dataclass
 class Check:
@@ -83,7 +73,6 @@ class Check:
     check: str
     status: str
     detail: str
-
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Assess a candidate CICE run against an existing shuga reference simulation.")
@@ -121,22 +110,19 @@ def parse_args() -> argparse.Namespace:
                    help="Rebuild candidate requested metrics stores. Never applies to the reference simulation.")
     return p.parse_args()
 
-
 def canonical_hemisphere(value: str) -> str:
-    token = value.strip().upper()
+    token   = value.strip().upper()
     mapping = {"S": "SH", "SH": "SH", "SOUTH": "SH", "N": "NH", "NH": "NH", "NORTH": "NH"}
     if token not in mapping:
         raise ValueError(f"Unsupported hemisphere {value!r}; use SH/NH.")
     return mapping[token]
 
-
 def resolve_roots(args: argparse.Namespace) -> tuple[Path, Path, Path, Path | None]:
-    afim_root = Path(args.afim_output_root).expanduser() if args.afim_output_root else Path(f"/g/data/{args.project}/{args.user}/afim_output")
-    history_root = Path(args.history_root).expanduser() if args.history_root else Path(f"/g/data/{args.project}/{args.user}/cice-dirs/runs/{args.run_name}/history")
+    afim_root      = Path(args.afim_output_root).expanduser() if args.afim_output_root else Path(f"/g/data/{args.project}/{args.user}/afim_output")
+    history_root   = Path(args.history_root).expanduser() if args.history_root else Path(f"/g/data/{args.project}/{args.user}/cice-dirs/runs/{args.run_name}/history")
     reference_root = Path(args.reference_root).expanduser() if args.reference_root else afim_root / args.reference_sim
-    static_store = Path(args.static_store).expanduser() if args.static_store else None
+    static_store   = Path(args.static_store).expanduser() if args.static_store else None
     return afim_root, history_root, reference_root, static_store
-
 
 def discover_history_files(history_root: Path, start_date: str | None, end_date: str | None):
     if not history_root.exists():
@@ -164,14 +150,12 @@ def discover_history_files(history_root: Path, start_date: str | None, end_date:
     missing = expected.difference(selected_dates)
     return selected, use_start, use_end, missing
 
-
 def snapshot_source(files: list[Path]) -> dict[Path, SourceFileState]:
     out = {}
     for path in files:
         st = path.stat()
         out[path] = SourceFileState(size=st.st_size, mtime_ns=st.st_mtime_ns)
     return out
-
 
 def verify_source_unchanged(snapshot: dict[Path, SourceFileState]) -> None:
     changed: list[str] = []
@@ -185,11 +169,9 @@ def verify_source_unchanged(snapshot: dict[Path, SourceFileState]) -> None:
     if changed:
         raise RuntimeError("Candidate source NetCDF files changed during health processing.\n" + "\n".join(changed[:20]))
 
-
 def run_command(cmd: list[str]) -> None:
     print("\n+ " + " ".join(cmd), flush=True)
     subprocess.run(cmd, check=True)
-
 
 def process_candidate(args: argparse.Namespace, history_root: Path, afim_root: Path, static_store: Path | None,
                       start: pd.Timestamp, end: pd.Timestamp, hemispheres: list[str]) -> None:
@@ -226,7 +208,6 @@ def process_candidate(args: argparse.Namespace, history_root: Path, afim_root: P
             cmd.append("--overwrite")
         run_command(cmd)
 
-
 def make_context(*, sim_name: str, hemisphere: str, start: str, end: str, project: str, user: str,
                  afim_root: Path, static_store: Path | None, args: argparse.Namespace, ice_type: str):
     run_cfg = RunSpec(sim_name=sim_name, start_date=start, end_date=end, hemisphere=hemisphere,
@@ -238,7 +219,6 @@ def make_context(*, sim_name: str, hemisphere: str, start: str, end: str, projec
                          archive_root=afim_root, static_store=static_store)
     return run_cfg, cls_cfg, pth_cfg
 
-
 def open_metric_group(*, sim_name: str, hemisphere: str, start: str, end: str, afim_root: Path,
                       static_store: Path | None, args: argparse.Namespace, ice_type: str, variables: tuple[str, ...]) -> xr.Dataset:
     run_cfg, cls_cfg, pth_cfg = make_context(sim_name=sim_name, hemisphere=hemisphere, start=start, end=end,
@@ -248,7 +228,6 @@ def open_metric_group(*, sim_name: str, hemisphere: str, start: str, end: str, a
     return load_metrics(run_cfg=run_cfg, cls_cfg=cls_cfg, pth_cfg=pth_cfg, classification=classification,
                         dt0_str=start, dtN_str=end, variables=list(variables), hemisphere=hemisphere,
                         chunks={"time": args.chunks_time})
-
 
 def open_cice_for_health(*, sim_name: str, sim_root: Path, hemisphere: str, start: str, end: str,
                          afim_root: Path, static_store: Path | None, args: argparse.Namespace,
@@ -263,18 +242,15 @@ def open_cice_for_health(*, sim_name: str, sim_root: Path, hemisphere: str, star
                      variables=variables, hemisphere=hemisphere, cice_store=cice_store,
                      static_store=static_store, chunks={"time": args.chunks_time})
 
-
 def aice_fraction(aice: xr.DataArray) -> xr.DataArray:
     max_value = float(aice.max(skipna=True).compute())
     return aice / 100.0 if max_value > 1.5 else aice
-
 
 def spatial_dims(da: xr.DataArray) -> tuple[str, ...]:
     dims = tuple(d for d in da.dims if d != "time")
     if not dims:
         raise ValueError(f"Could not infer spatial dimensions from {da.name!r}: {da.dims}")
     return dims
-
 
 def transient_sic_sie(ds: xr.Dataset, threshold: float) -> dict[str, xr.DataArray]:
     aice = aice_fraction(ds["aice"])
@@ -292,7 +268,6 @@ def transient_sic_sie(ds: xr.Dataset, threshold: float) -> dict[str, xr.DataArra
     sic.attrs.update(long_name=f"Area-weighted mean SIC within {threshold:g} extent", units="%")
     return {"SIC": sic, "SIE": sie}
 
-
 def normalize_area_for_display(da: xr.DataArray) -> xr.DataArray:
     units = str(da.attrs.get("units", "")).lower().replace(" ", "")
     out = da
@@ -301,7 +276,6 @@ def normalize_area_for_display(da: xr.DataArray) -> xr.DataArray:
     elif units in {"m^2", "m2", "m²"}:
         out = da / 1.0e12
     return out
-
 
 def to_series(da: xr.DataArray) -> pd.Series:
     work = da.squeeze(drop=True)
@@ -312,13 +286,11 @@ def to_series(da: xr.DataArray) -> pd.Series:
     index = pd.DatetimeIndex(pd.to_datetime(work.time.values)).tz_localize(None)
     return pd.Series(values, index=index, name=da.name).sort_index()
 
-
 def metric_series(ds: xr.Dataset, name: str) -> pd.Series:
     if name not in ds:
         return pd.Series(dtype=float, name=name)
     da = normalize_area_for_display(ds[name]) if name in {"SIA", "FIA"} else ds[name]
     return to_series(da)
-
 
 def load_health_series(*, sim_name: str, sim_root: Path, hemisphere: str, start: str, end: str,
                        afim_root: Path, static_store: Path | None, args: argparse.Namespace,
@@ -354,7 +326,6 @@ def load_health_series(*, sim_name: str, sim_root: Path, hemisphere: str, start:
         out["SIE"] = pd.Series(dtype=float, name="SIE")
     return out
 
-
 def candidate_physical_checks(*, sim_root: Path, hemisphere: str, start: str, end: str,
                               afim_root: Path, static_store: Path | None, args: argparse.Namespace) -> list[Check]:
     checks: list[Check] = []
@@ -373,7 +344,6 @@ def candidate_physical_checks(*, sim_root: Path, hemisphere: str, start: str, en
                             f"min={vmin:.6g}, max={vmax:.6g}."))
     return checks
 
-
 def aligned_frame(candidate: dict[str, pd.Series], reference: dict[str, pd.Series], full_index: pd.DatetimeIndex) -> pd.DataFrame:
     df = pd.DataFrame(index=full_index)
     df.index.name = "date"
@@ -382,10 +352,8 @@ def aligned_frame(candidate: dict[str, pd.Series], reference: dict[str, pd.Serie
         df[f"reference_{metric}"] = reference.get(metric, pd.Series(dtype=float)).reindex(full_index)
     return df
 
-
 def safe_ratio(num: float, den: float) -> float:
     return np.nan if not np.isfinite(num) or not np.isfinite(den) or abs(den) < 1e-12 else num / den
-
 
 def make_summary(df: pd.DataFrame, final_window: int) -> pd.DataFrame:
     rows = []
@@ -422,7 +390,6 @@ def make_summary(df: pd.DataFrame, final_window: int) -> pd.DataFrame:
         rows.append(row)
     return pd.DataFrame(rows)
 
-
 def plot_health(df: pd.DataFrame, hemisphere: str, run_name: str, reference: str, outpath: Path) -> None:
     fig, axes = plt.subplots(4, 2, figsize=(14, 15), sharex=True)
     axes = axes.ravel()
@@ -440,7 +407,6 @@ def plot_health(df: pd.DataFrame, hemisphere: str, run_name: str, reference: str
     fig.savefig(outpath, dpi=180, bbox_inches="tight")
     plt.close(fig)
 
-
 def overall_status(checks: list[Check]) -> str:
     statuses = {c.status for c in checks}
     if "FAIL" in statuses:
@@ -448,7 +414,6 @@ def overall_status(checks: list[Check]) -> str:
     if "WARN" in statuses:
         return "WARN"
     return "PASS"
-
 
 def write_report(path: Path, *, args: argparse.Namespace, history_root: Path, candidate_root: Path,
                  reference_root: Path, start: pd.Timestamp, end: pd.Timestamp,
@@ -479,7 +444,6 @@ def write_report(path: Path, *, args: argparse.Namespace, history_root: Path, ca
             ratio_text = "n/a" if not np.isfinite(ratio) else f"{ratio:.3f}"
             lines.append(f"{row['metric']:>3s}: candidate={row['candidate_final_window_median']:.6g}  reference={row['reference_final_window_median']:.6g}  ratio={ratio_text}  n={int(row['n_common'])}")
     path.write_text("\n".join(lines) + "\n")
-
 
 def main() -> None:
     args = parse_args()
@@ -526,7 +490,6 @@ def main() -> None:
     print(f"  dates     : {start_s} -> {end_s}")
     print(f"  status    : {overall_status(checks)}")
     print(f"  output    : {outdir}")
-
 
 if __name__ == "__main__":
     main()
