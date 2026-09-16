@@ -1,65 +1,37 @@
 # Monthly Sea Ice Science Chat Figures
 
-Last refreshed: 2026-09-16T13:09:32
+Last refreshed: 2026-09-16T14:33:15
 
 Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat`
-
-## ERA5 wind SIE SH 202512
-
-![ERA5 wind SIE SH 202512](../figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202512.png)
-
-## ERA5 wind SIE SH 202606
-
-![ERA5 wind SIE SH 202606](../figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202606.png)
-
-## ERA5 wind SIE SH 202608
-
-![ERA5 wind SIE SH 202608](../figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202608.png)
-
-## NSIDC Arctic vs Antarctic annual
-
-![NSIDC Arctic vs Antarctic annual](../figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_annual.png)
-
-## NSIDC Arctic vs Antarctic monthly anomalies
-
-![NSIDC Arctic vs Antarctic monthly anomalies](../figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png)
-
-## NSIDC SH sic anomaly 202604
-
-![NSIDC SH sic anomaly 202604](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202604.png)
-
-## NSIDC SH sic anomaly 202605
-
-![NSIDC SH sic anomaly 202605](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202605.png)
-
-## NSIDC SH sic anomaly 202607
-
-![NSIDC SH sic anomaly 202607](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202607.png)
-
-## NSIDC SH total SIA SIE monthly
-
-![NSIDC SH total SIA SIE monthly](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_total_SIA_SIE_monthly.png)
-
-## NSIDC SIA cdr monthly tplot absolute
-
-![NSIDC SIA cdr monthly tplot absolute](../figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_absolute.png)
-
-## NSIDC SIA cdr monthly tplot standardised
-
-![NSIDC SIA cdr monthly tplot standardised](../figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_standardised.png)
 
 ## NSIDC SIE cdr monthly anoms byyear
 
 ![NSIDC SIE cdr monthly anoms byyear](../figs/mthly_sea_ice_sci_chat/NSIDC_SIE_cdr_monthly_anoms_byyear.png)
 
+## NSIDC SIA cdr monthly tplot absolute
+
+![NSIDC SIA cdr monthly tplot absolute](../figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_absolute.png)
+
+## NSIDC SH sic anomaly — 2026-07
+
+![NSIDC SH sic anomaly — 2026-07](../figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202607.png)
+
+## OISST global SST anomaly and NSIDC SIE — 2026-07
+
+![OISST global SST anomaly and NSIDC SIE — 2026-07](../figs/mthly_sea_ice_sci_chat/OISST_global_sst_anomaly_202607.png)
+
+## ERA5 wind speed, MSLP and NSIDC SIE — 2026-07
+
+![ERA5 wind speed, MSLP and NSIDC SIE — 2026-07](../figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202607.png)
+
 ## NSIDC SIEmax vs day-of-max
 
 ![NSIDC SIEmax vs day-of-max](../figs/mthly_sea_ice_sci_chat/NSIDC_SIEmax_vs_day-of-max.png)
 
-## OISST global sst anomaly 202604
+## NSIDC Arctic vs Antarctic monthly anomalies
 
-![OISST global sst anomaly 202604](../figs/mthly_sea_ice_sci_chat/OISST_global_sst_anomaly_202604.png)
+The left panel shows the combined Arctic and Antarctic monthly SIE anomaly: values below zero mean global sea-ice extent was below its calendar-month climatology. In the right panel, each point is one month; the lower-left quadrant means both hemispheres were below average, while the opposite-sign quadrants show compensation between hemispheres. Black denotes months before 2005; red denotes 2005 onward.
 
-## OISST global sst anomaly 202607
+![NSIDC Arctic vs Antarctic monthly anomalies](../figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png)
 
-![OISST global sst anomaly 202607](../figs/mthly_sea_ice_sci_chat/OISST_global_sst_anomaly_202607.png)
+*Constructed from separate Arctic and Antarctic calendar-month anomalies relative to the 1979–2018 NSIDC climatology; the hemispheric anomalies are summed for the global series.*
