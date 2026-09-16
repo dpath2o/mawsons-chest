@@ -8,16 +8,22 @@ FLOES_ROOT = THIS.parents[2]
 PARENT     = FLOES_ROOT.parent
 if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
-from floes.io.download import nsidc_cli  # noqa: E402
+from floes.io.download import bremen_cli, esa_cci_sit_cli, nsidc_cli  # noqa: E402
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Download observational products used by floes.")
     sub = p.add_subparsers(dest="product", required=True)
-    nsidc = sub.add_parser("nsidc-g02202", help="Download NSIDC NOAA/NSIDC CDR G02202 products")
+    sub.add_parser("nsidc-g02202", help="Download NSIDC NOAA/NSIDC CDR G02202 products")
+    sub.add_parser("bremen-amsr2", help="Download University of Bremen AMSR2 SIC products")
+    sub.add_parser("esa-cci-sit", help="Download ESA CCI L2P/L3C sea-ice-thickness products")
     # Parse the product command, then pass remaining args to the dedicated parser.
     args, rest = p.parse_known_args(argv)
     if args.product == "nsidc-g02202":
         return nsidc_cli(rest)
+    if args.product == "bremen-amsr2":
+        return bremen_cli(rest)
+    if args.product == "esa-cci-sit":
+        return esa_cci_sit_cli(rest)
     raise ValueError(args.product)
 
 if __name__ == "__main__":

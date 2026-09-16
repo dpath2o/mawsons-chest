@@ -7,6 +7,8 @@ import sys
 import traceback
 from pathlib import Path
 
+import pandas as pd
+
 THIS = Path(__file__).resolve()
 FLOES_ROOT = THIS.parents[1]
 PARENT = FLOES_ROOT.parent
@@ -14,7 +16,15 @@ if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
 
 from floes.config import default_config, previous_complete_month  # noqa: E402
+from floes.io.download import (  # noqa: E402
+    build_bremen_amsr2_jobs,
+    build_esa_cci_sit_jobs,
+    build_nsidc_g02202_jobs,
+    download_jobs,
+)
+from floes.observations.bremen import BremenSeaIceReader  # noqa: E402
 from floes.observations.era5 import ERA5Reader  # noqa: E402
+from floes.observations.esa_cci import ESACCISITReader  # noqa: E402
 from floes.observations.nsidc import NSIDCReader  # noqa: E402
 from floes.observations.ocean import OceanReader  # noqa: E402
 from floes.observations.oisst import OISSTReader  # noqa: E402
@@ -67,6 +77,12 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("/g/data/rt52"),
         help="Root containing the official era5/ and near-real-time era5t/ collections.",
     )
+    p.add_argument(
+        "--seaice-root",
+        type=Path,
+        default=Path("/g/data/gv90/da1339/SeaIce"),
+        help="Local archive for NSIDC, University of Bremen and ESA CCI sea-ice products.",
+    )
     p.add_argument("--fig-dir", type=Path, default=None, help="Figure output directory.")
     p.add_argument("--docs-dir", type=Path, default=None, help="Documentation/gallery output directory.")
     p.add_argument("--year", type=int, default=default_year)
@@ -88,7 +104,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Base containing NSIDC/SIE_daily pre-integrated daily files.",
     )
     p.add_argument("--skip-will-suite", action="store_true", help="Skip the legacy NSIDC diagnostic reproductions.")
-    p.add_argument("--download-missing", action="store_true", help="Reserved flag for future downloader orchestration.")
+    p.add_argument(
+        "--update-observations",
+        "--download-missing",
+        dest="update_observations",
+        action="store_true",
+        help="Discover and download current NSIDC, Bremen and ESA CCI products before plotting.",
+    )
     p.add_argument("--strict", action="store_true", help="Fail on first missing optional product.")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--verbose", action="store_true")
@@ -98,6 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         project=args.project,
         user=args.user,
         gadi_base=args.gadi_base,
+        seaice_root=args.seaice_root,
         era5_root=args.era5_root,
         output_root=args.fig_dir,
         docs_root=args.docs_dir,
@@ -111,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         "requested_year": args.year,
         "requested_month": args.month,
         "gadi_base": str(cfg.gadi_base),
+        "seaice_root": str(cfg.seaice_root),
         "era5_root": str(cfg.era5_root),
         "nsidc_daily_base": str(args.nsidc_daily_base),
         "figure_root": str(cfg.figure_root),
@@ -124,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         "Note           : if that month is unavailable, map products fall back to latest available <= requested month."
     )
     print(f"Gadi base      : {cfg.gadi_base}")
+    print(f"Sea-ice root   : {cfg.seaice_root}")
     print(f"ERA5 root      : {cfg.era5_root}")
     print(f"NSIDC daily    : {args.nsidc_daily_base}")
     print(f"Figure dir     : {cfg.figure_root}")
@@ -134,10 +159,83 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     keep_going = not args.strict
+
+    def checked_download(jobs, *, min_bytes: int = 10_000):
+        if not jobs:
+            raise RuntimeError("The remote archive discovery returned no matching files.")
+        status = download_jobs(jobs, workers=4, retries=4, min_bytes=min_bytes)
+        if status:
+            raise RuntimeError("One or more observation downloads failed; see messages above.")
+        return f"checked {len(jobs)} files"
+
+    if args.update_observations:
+        def update_nsidc():
+            jobs = build_nsidc_g02202_jobs(
+                dest_root=Path(cfg.seaice_root) / "NSIDC",
+                hemis=["south"],
+                start_year=cfg.climatology_start,
+                end_year=args.year,
+                daily_mode="aggregate",
+                monthly_mode="aggregate",
+                include_ancillary=True,
+            )
+            jobs.extend(
+                build_nsidc_g02202_jobs(
+                    dest_root=Path(cfg.seaice_root) / "NSIDC",
+                    hemis=["north"],
+                    start_year=cfg.climatology_start,
+                    end_year=args.year,
+                    daily_mode="none",
+                    monthly_mode="aggregate",
+                    include_ancillary=True,
+                )
+            )
+            return checked_download(jobs)
+
+        _run_step(
+            "Update NSIDC G02202 V6",
+            update_nsidc,
+            keep_going=True,
+            manifest=manifest,
+            verbose=args.verbose,
+        )
+
+        def update_bremen():
+            end_period = pd.Period(f"{args.year:04d}-{args.month:02d}", freq="M")
+            recent_periods = [end_period - offset for offset in range(4)]
+            jobs = []
+            for year in sorted({period.year for period in recent_periods}):
+                months = [period.month for period in recent_periods if period.year == year]
+                jobs.extend(build_bremen_amsr2_jobs(dest_root=cfg.seaice_root, year=year, months=months))
+            return checked_download(jobs)
+
+        _run_step(
+            "Update University of Bremen AMSR2 SIC",
+            update_bremen,
+            keep_going=True,
+            manifest=manifest,
+            verbose=args.verbose,
+        )
+
+        def update_esa_cci():
+            jobs = build_esa_cci_sit_jobs(dest_root=cfg.seaice_root)
+            return checked_download(jobs)
+
+        _run_step(
+            "Update ESA CCI L2P/L3C SIT",
+            update_esa_cci,
+            keep_going=True,
+            manifest=manifest,
+            verbose=args.verbose,
+        )
+
     plotter = MonthlySeaIceChatPlotter(cfg)
     nsidc = NSIDCReader(cfg, hemisphere="SH", daily_base=args.nsidc_daily_base)
+    bremen = BremenSeaIceReader(cfg)
+    esa_cci = ESACCISITReader(cfg)
     monthly_totals: dict[str, object] = {}
     map_sic_cache: dict[str, object] = {}
+    bremen_cache: dict[tuple[int, int], object] = {}
 
     def total_for(hemisphere: str):
         hemisphere = hemisphere.upper()
@@ -166,6 +264,20 @@ def main(argv: list[str] | None = None) -> int:
             fallback_latest=False,
         )["sic"].compute()
 
+    def bremen_edge_for(year: int, month: int):
+        key = (int(year), int(month))
+        if key not in bremen_cache:
+            bremen_cache[key] = bremen.month(year=year, month=month, fallback_latest=False).compute()
+        return bremen_cache[key]
+
+    def comparison_edges(year: int, month: int):
+        edges = [(ice_edge_for(year, month), "1.0p,black")]
+        try:
+            edges.append((bremen_edge_for(year, month), "1.0p,orange,-"))
+        except Exception as exc:  # noqa: BLE001 - Bremen is an independent optional comparison
+            print(f"WARNING: Bremen SIE edge unavailable for {year:04d}-{month:02d}: {exc}")
+        return edges
+
     def nsidc_sic_map():
         ds = latest_map_sic()
         y, m, exact = _actual_ym(ds, args.year, args.month)
@@ -181,11 +293,87 @@ def main(argv: list[str] | None = None) -> int:
         out = cfg.figure_root / "NSIDC_SH_total_SIA_SIE_monthly.png"
         return plotter.plot_total_sia_sie(ds, output=out)
 
+    def bremen_sic_map():
+        da = bremen.month(year=args.year, month=args.month, fallback_latest=True).compute()
+        y, m, exact = _actual_ym(da, args.year, args.month)
+        if not exact:
+            print(
+                f"Using latest available Bremen SIC month {y:04d}-{m:02d} "
+                f"for requested {args.year:04d}-{args.month:02d}."
+            )
+        out = cfg.figure_root / f"BREMEN_AMSR2_SH_sic_SIE_{y:04d}{m:02d}.png"
+        return plotter.plot_gridded_anomaly(
+            da,
+            output=out,
+            title=f"{y:04d}-{m:02d}",
+            cpt="cmocean/ice",
+            value_range=(0.0, 1.0),
+            colorbar_label="sea-ice concentration",
+            colorbar_unit="fraction",
+            ice_edges=[
+                (ice_edge_for(y, m), "1.0p,black"),
+                (da, "1.0p,orange,-"),
+            ],
+            stride=2,
+        )
+
+    def bremen_processed_products():
+        processed = bremen.root / "processed"
+        processed.mkdir(parents=True, exist_ok=True)
+        monthly_path = processed / "BREMEN_AMSR2_SH_SIC_monthly.nc"
+        totals_path = processed / "BREMEN_AMSR2_SH_SIA_SIE_daily.nc"
+        sic = bremen.sic()
+        sic.resample(time="MS").mean(skipna=True).to_dataset(name="sic").to_netcdf(monthly_path)
+        bremen.total_sia_sie().to_netcdf(totals_path)
+        return f"{monthly_path}; {totals_path}"
+
+    def esa_cci_sit_map():
+        da = esa_cci.month(year=args.year, month=args.month, fallback_latest=True).compute()
+        y, m, exact = _actual_ym(da, args.year, args.month)
+        if not exact:
+            print(
+                f"Using latest available ESA CCI L3C SIT month {y:04d}-{m:02d} "
+                f"for requested {args.year:04d}-{args.month:02d}."
+            )
+        out = cfg.figure_root / f"ESA_CCI_L3C_SH_sit_{y:04d}{m:02d}.png"
+        return plotter.plot_gridded_anomaly(
+            da,
+            output=out,
+            title=f"{y:04d}-{m:02d}",
+            cpt="cmocean/thermal",
+            value_range=(0.0, 3.0),
+            colorbar_label="sea-ice thickness",
+            colorbar_unit="m",
+            ice_edge=ice_edge_for(y, m),
+            stride=1,
+        )
+
     nsidc_sic_path = _run_step(
         "NSIDC SIC anomaly map", nsidc_sic_map, keep_going=keep_going, manifest=manifest, verbose=args.verbose
     )
     _run_step(
         "NSIDC total SIA/SIE time series", nsidc_sia_ts, keep_going=keep_going, manifest=manifest, verbose=args.verbose
+    )
+    _run_step(
+        "Process University of Bremen SIC/SIA/SIE",
+        bremen_processed_products,
+        keep_going=True,
+        manifest=manifest,
+        verbose=args.verbose,
+    )
+    bremen_sic_path = _run_step(
+        "University of Bremen AMSR2 SIC/SIE map",
+        bremen_sic_map,
+        keep_going=True,
+        manifest=manifest,
+        verbose=args.verbose,
+    )
+    esa_sit_path = _run_step(
+        "ESA CCI L3C SIT map",
+        esa_cci_sit_map,
+        keep_going=True,
+        manifest=manifest,
+        verbose=args.verbose,
     )
 
     will_sia_path = None
@@ -238,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
 
         def will_sie_maximum():
             daily = nsidc.daily_total_sia_sie()
+            daily.to_netcdf(cfg.figure_root / "NSIDC_SH_total_SIA_SIE_daily.nc")
             maxima = annual_sie_maximum(daily["SIE"])
             maxima.to_netcdf(cfg.figure_root / "NSIDC_SH_SIE_annual_maximum.nc")
             return diagnostics.plot_sie_maximum_vs_day(
@@ -288,7 +477,10 @@ def main(argv: list[str] | None = None) -> int:
         da = OISSTReader(cfg).anomaly_field(year=target_year, month=target_month, fallback_latest=True)
         y, m, exact = _actual_ym(da, target_year, target_month)
         if not exact:
-            print(f"Using latest available OISST month {y:04d}-{m:02d} for requested {target_year:04d}-{target_month:02d}.")
+            print(
+                f"Using latest available OISST month {y:04d}-{m:02d} "
+                f"for requested {target_year:04d}-{target_month:02d}."
+            )
         out = cfg.figure_root / f"OISST_global_sst_anomaly_{y:04d}{m:02d}.png"
         return plotter.plot_gridded_anomaly(
             da,
@@ -298,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
             value_range=(-2.0, 2.0),
             colorbar_label="SST anomaly",
             colorbar_unit="degC",
-            ice_edge=ice_edge_for(y, m),
+            ice_edges=comparison_edges(y, m),
         )
 
     def era5_wind_map():
@@ -324,7 +516,7 @@ def main(argv: list[str] | None = None) -> int:
             value_range=(0.0, 40.0),
             colorbar_label="wind speed",
             colorbar_unit="m/s",
-            ice_edge=ice_edge_for(y, m),
+            ice_edges=comparison_edges(y, m),
             contour=fields["mslp"],
             contour_interval=4.0,
             contour_annotation=8.0,
@@ -404,13 +596,37 @@ def main(argv: list[str] | None = None) -> int:
         gallery_figures.append(
             GalleryFigure(Path(nsidc_sic_path), f"NSIDC SH sic anomaly — {y:04d}-{m:02d}")
         )
+    if bremen_sic_path:
+        name = Path(bremen_sic_path).stem
+        stamp = name.rsplit("_", 1)[-1]
+        gallery_figures.append(
+            GalleryFigure(
+                Path(bremen_sic_path),
+                f"University of Bremen AMSR2 SH SIC and SIE — {stamp[:4]}-{stamp[4:]}",
+                caption=(
+                    "Monthly-mean ASI-AMSR2 SIC; black edge is NSIDC and dashed orange edge is Bremen, "
+                    "both at 15% SIC."
+                ),
+            )
+        )
+    if esa_sit_path:
+        name = Path(esa_sit_path).stem
+        stamp = name.rsplit("_", 1)[-1]
+        gallery_figures.append(
+            GalleryFigure(
+                Path(esa_sit_path),
+                f"ESA CCI L3C SH monthly SIT — {stamp[:4]}-{stamp[4:]}",
+                caption="Monthly gridded L3C sea-ice thickness; black line is the matching-month NSIDC 15% SIC edge.",
+            )
+        )
     if oisst_path:
         name = Path(oisst_path).stem
         stamp = name.rsplit("_", 1)[-1]
         gallery_figures.append(
             GalleryFigure(
                 Path(oisst_path),
-                f"OISST global SST anomaly and NSIDC SIE — {stamp[:4]}-{stamp[4:]}",
+                f"OISST global SST anomaly and observed SIE — {stamp[:4]}-{stamp[4:]}",
+                caption="Black edge is NSIDC and dashed orange edge is University of Bremen AMSR2, both at 15% SIC.",
             )
         )
     if era5_path:
@@ -419,7 +635,8 @@ def main(argv: list[str] | None = None) -> int:
         gallery_figures.append(
             GalleryFigure(
                 Path(era5_path),
-                f"ERA5 wind speed, MSLP and NSIDC SIE — {stamp[:4]}-{stamp[4:]}",
+                f"ERA5 wind speed, MSLP and observed SIE — {stamp[:4]}-{stamp[4:]}",
+                caption="Black edge is NSIDC and dashed orange edge is University of Bremen AMSR2, both at 15% SIC.",
             )
         )
     if will_sie_max_path:

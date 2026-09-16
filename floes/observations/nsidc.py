@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
+import numpy as np
 import xarray as xr
 
 from floes.config import FloesConfig
 from floes.io.gadi import find_product_files, open_product
 
+from .gridded import attach_dataset_coordinates
 from .sea_ice import (
     compute_sia_sie,
     ensure_time_dim,
@@ -21,6 +23,9 @@ from .sea_ice import (
 
 
 _DAILY_VERSION_RE = re.compile(r"_(\d{4})(?:_v(\d+)r(\d+))?\.nc$")
+_AGGREGATE_RE = re.compile(
+    r"sic_(ps[ns]25)_(\d{6}|\d{8})-(\d{6}|\d{8})_v(\d+)r(\d+)\.nc$"
+)
 
 
 def prefer_latest_daily_versions(files: list[Path]) -> list[Path]:
@@ -62,13 +67,82 @@ class NSIDCReader:
         self.area_key = self.area_key or f"nsidc_cell_area_{suffix}"
 
     def available_files(self) -> list[Path]:
+        files = self._monthly_aggregate_files()
+        if files:
+            return files
         return find_product_files(self.product_key, base=self.config.gadi_base, strict=False)
 
     def open_sic_dataset(self) -> xr.Dataset:
+        files = self._monthly_aggregate_files()
+        if files:
+            return self._open_files(files)
         return open_product(self.product_key, base=self.config.gadi_base, chunks=self.config.chunks, strict=True)
 
+    @property
+    def _grid(self) -> str:
+        return "pss25" if self.hemisphere == "SH" else "psn25"
+
+    @property
+    def _hemi_directory(self) -> str:
+        return "south" if self.hemisphere == "SH" else "north"
+
+    def _version_roots(self) -> list[Path]:
+        root = Path(self.config.seaice_root) / "NSIDC"
+        return sorted(root.glob("G02202_V*"), reverse=True)
+
+    def _aggregate_candidates(self, digits: int) -> list[Path]:
+        candidates: list[Path] = []
+        for root in self._version_roots():
+            directory = root / self._hemi_directory / "aggregate"
+            candidates.extend(directory.glob(f"sic_{self._grid}_{'?' * digits}-{'?' * digits}_v*r*.nc"))
+        return sorted(set(candidates))
+
+    def _monthly_aggregate_files(self) -> list[Path]:
+        """Return only the newest cumulative monthly aggregate.
+
+        Older cumulative files overlap the newest file and must not be passed
+        together to ``open_mfdataset``.
+        """
+        candidates = self._aggregate_candidates(6)
+        ranked: list[tuple[tuple[int, int, int], Path]] = []
+        for path in candidates:
+            match = _AGGREGATE_RE.fullmatch(path.name)
+            if match:
+                ranked.append(((int(match.group(3)), int(match.group(4)), int(match.group(5))), path))
+        return [max(ranked, key=lambda item: item[0])[1]] if ranked else []
+
+    def _daily_aggregate_files(self) -> list[Path]:
+        """Return the newest non-overlapping daily aggregate for each start year."""
+        selected: dict[int, tuple[tuple[int, int, int], Path]] = {}
+        for path in self._aggregate_candidates(8):
+            match = _AGGREGATE_RE.fullmatch(path.name)
+            if not match:
+                continue
+            start = int(match.group(2))
+            key = (int(match.group(3)), int(match.group(4)), int(match.group(5)))
+            year = start // 10_000
+            if year not in selected or key > selected[year][0]:
+                selected[year] = (key, path)
+        return [selected[year][1] for year in sorted(selected)]
+
+    def _open_files(self, files: list[Path]) -> xr.Dataset:
+        return xr.open_mfdataset(
+            [str(path) for path in files],
+            chunks=self.config.chunks,
+            combine="by_coords",
+            data_vars="minimal",
+            coords="minimal",
+            compat="override",
+            join="outer",
+            decode_timedelta=False,
+        )
+
     def open_area(self) -> xr.DataArray:
-        ds = open_product(self.area_key, base=self.config.gadi_base, chunks=None, strict=True)
+        ancillary = self._ancillary_files()
+        if ancillary:
+            ds = xr.open_dataset(sorted(ancillary)[-1], chunks=None, decode_timedelta=False)
+        else:
+            ds = open_product(self.area_key, base=self.config.gadi_base, chunks=None, strict=True)
         if "cell_area" in ds:
             area = ds["cell_area"]
         else:
@@ -79,14 +153,34 @@ class NSIDCReader:
         area.attrs.setdefault("units", "m2")
         return area
 
+    def _ancillary_files(self) -> list[Path]:
+        files: list[Path] = []
+        for root in self._version_roots():
+            files.extend(
+                path
+                for path in (root / self._hemi_directory / "ancillary").glob(f"*{self._grid}*.nc")
+                if "invalid-ice" not in path.name
+            )
+        return sorted(files)
+
+    def _attach_geographic_coords(self, da: xr.DataArray, ds: xr.Dataset) -> xr.DataArray:
+        out = attach_dataset_coordinates(da, ds)
+        if any(name in out.coords for name in ("longitude", "lon")) and any(
+            name in out.coords for name in ("latitude", "lat")
+        ):
+            return out
+        ancillary = self._ancillary_files()
+        if not ancillary:
+            return out
+        coords = xr.open_dataset(ancillary[-1], chunks=None, decode_timedelta=False)
+        return attach_dataset_coordinates(out, coords)
+
     def sic(self) -> xr.DataArray:
         ds = self.open_sic_dataset()
         for name in ("cdr_seaice_conc_monthly", "cdr_seaice_conc", "ice_conc", "seaice_conc", "sic"):
             if name in ds:
                 out = standardise_sic(ds[name])
-                for coord_name in ("longitude", "latitude", "lon", "lat"):
-                    if coord_name in ds and coord_name not in out.coords:
-                        out = out.assign_coords({coord_name: ds[coord_name]})
+                out = self._attach_geographic_coords(out, ds)
                 out.name = "sic"
                 return out
         raise KeyError(f"No recognised SIC variable in NSIDC dataset: {list(ds.data_vars)}")
@@ -98,9 +192,37 @@ class NSIDCReader:
         return out
 
     def daily_total_sia_sie(self) -> xr.Dataset:
-        """Open the pre-integrated daily SH SIA/SIE files used by the legacy workflow."""
+        """Derive daily SH SIA/SIE from gridded G02202, with a legacy fallback."""
         if self.hemisphere != "SH":
             raise NotImplementedError("Only the Southern Hemisphere daily total product is registered.")
+        daily_files = self._daily_aggregate_files()
+        if daily_files:
+            ds = self._open_files(daily_files)
+            name = next(
+                (
+                    candidate
+                    for candidate in ("cdr_seaice_conc", "ice_conc", "seaice_conc", "sic")
+                    if candidate in ds
+                ),
+                None,
+            )
+            if name is None:
+                raise KeyError(f"No recognised daily SIC variable in NSIDC dataset: {list(ds.data_vars)}")
+            sic = self._attach_geographic_coords(standardise_sic(ds[name]), ds)
+            sic = sic.sortby("time")
+            _, unique = np.unique(sic["time"].values, return_index=True)
+            sic = sic.isel(time=sorted(unique))
+            out = compute_sia_sie(sic, self.open_area(), threshold=self.config.sic_threshold)
+            out.attrs.update(
+                {
+                    "source": "NSIDC G02202 V6 gridded daily SIC",
+                    "hemisphere": self.hemisphere,
+                    "temporal_resolution": "daily",
+                }
+            )
+            return out
+
+        # Compatibility fallback for Will Hobbs' pre-integrated legacy files.
         bases = []
         for base in (self.daily_base, self.config.gadi_base):
             if base is not None and Path(base) not in bases:

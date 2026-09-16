@@ -11,11 +11,11 @@ from floes.config import FloesConfig
 from .palettes import make_cpt, make_symmetric_cpt
 from .pygmt_base import (
     has_curvilinear_lon_lat,
+    infer_lon_lat,
     plot_geographic_contour,
     require_pygmt,
     south_polar_projection,
     south_polar_region,
-    write_xyz_from_curvilinear,
 )
 
 
@@ -53,14 +53,20 @@ class MonthlySeaIceChatPlotter:
         """Plot regular grids as rasters and curvilinear grids as lon/lat cells."""
         field = da.squeeze()
         if has_curvilinear_lon_lat(field):
-            xyz = output.with_suffix(f".{field.name or 'field'}.xyz")
-            write_xyz_from_curvilinear(field, xyz, stride=stride)
+            lon, lat = infer_lon_lat(field)
+            values = field.values[::stride, ::stride]
+            longitude = lon.values[::stride, ::stride]
+            latitude = lat.values[::stride, ::stride]
+            import numpy as np
+
+            valid = np.isfinite(values) & np.isfinite(longitude) & np.isfinite(latitude)
             fig.basemap(region=region, projection=projection, frame=["afg", f"+t{title}"])
             fig.plot(
-                data=str(xyz),
+                x=longitude[valid],
+                y=latitude[valid],
                 style=f"s{0.04 * stride:.3f}c",
                 cmap=str(cpt_path),
-                fill="+z",
+                fill=values[valid],
                 pen=None,
             )
         else:
@@ -154,6 +160,7 @@ class MonthlySeaIceChatPlotter:
         colorbar_label: str | None = None,
         colorbar_unit: str | None = None,
         ice_edge: xr.DataArray | None = None,
+        ice_edges: list[tuple[xr.DataArray, str]] | None = None,
         contour: xr.DataArray | None = None,
         contour_interval: float | None = None,
         contour_annotation: float | str | None = None,
@@ -191,6 +198,8 @@ class MonthlySeaIceChatPlotter:
             )
         if ice_edge is not None:
             plot_geographic_contour(fig, ice_edge, level=self.config.sic_threshold, pen="1.0p,black")
+        for edge, pen in ice_edges or []:
+            plot_geographic_contour(fig, edge, level=self.config.sic_threshold, pen=pen)
         x_label = colorbar_label or units_label
         frame = [f"x+l{x_label}"]
         if colorbar_unit:

@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 USER_AGENT = "Mozilla/5.0 (compatible; floes-gadi-downloader/0.1)"
@@ -37,6 +37,138 @@ def list_links(url: str) -> list[str]:
 
 def list_nc(url: str) -> list[str]:
     return [name for name in list_links(url) if name.endswith(".nc")]
+
+
+def _basename_from_link(link: str) -> str:
+    return Path(urlparse(link).path).name
+
+
+def build_bremen_amsr2_jobs(
+    *,
+    dest_root: Path,
+    year: int,
+    months: list[int],
+    base_url: str = "https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath",
+    resolution: str = "s6250",
+) -> list[DownloadJob]:
+    """Discover daily University of Bremen AMSR2 Antarctic SIC netCDF files."""
+    jobs: list[DownloadJob] = []
+    requested = {year * 100 + int(month) for month in months}
+    directory = f"{base_url.rstrip('/')}/{resolution}/netcdf/{year:04d}/"
+    try:
+        links = list_nc(directory)
+    except HTTPError as exc:
+        print(f"WARNING: cannot list Bremen SIC URL {directory}: {exc}", file=sys.stderr)
+        return []
+    for link in links:
+        name = _basename_from_link(link)
+        match = re.search(r"(\d{8})", name)
+        if not match or int(match.group(1)[:6]) not in requested:
+            continue
+        jobs.append(
+            DownloadJob(
+                urljoin(directory, link),
+                Path(dest_root)
+                / "University_Bremen"
+                / "AMSR2"
+                / "asi_daygrid_swath"
+                / resolution
+                / "netcdf"
+                / f"{year:04d}"
+                / name,
+            )
+        )
+    return sorted({str(job.dest): job for job in jobs}.values(), key=lambda job: str(job.dest))
+
+
+def _thredds_dataset_ids(catalog_url: str) -> list[str]:
+    output: list[str] = []
+    for link in list_links(catalog_url):
+        query = parse_qs(urlparse(html.unescape(link)).query)
+        for dataset_id in query.get("dataset", []):
+            dataset_id = unquote(dataset_id)
+            if dataset_id.endswith(".nc"):
+                output.append(dataset_id)
+    return sorted(set(output))
+
+
+def _thredds_subcatalogs(catalog_url: str) -> list[str]:
+    output: list[str] = []
+    for link in list_links(catalog_url):
+        clean = html.unescape(link).split("?", 1)[0]
+        if clean.endswith("/catalog.html"):
+            resolved = urljoin(catalog_url, clean)
+            if resolved != catalog_url:
+                output.append(resolved)
+    return sorted(set(output))
+
+
+def build_esa_cci_sit_jobs(
+    *,
+    dest_root: Path,
+    levels: tuple[str, ...] | list[str] = ("L2P", "L3C"),
+    sensors: tuple[str, ...] | list[str] = ("sentinel3a", "sentinel3b"),
+    hemisphere: str = "SH",
+    version: str = "v4.0",
+    start_year: int | None = None,
+    end_year: int | None = None,
+    catalog_root: str = (
+        "https://data.cci.ceda.ac.uk/thredds/catalog/esacci/sea_ice/data/sea_ice_thickness"
+    ),
+) -> list[DownloadJob]:
+    """Discover ESA CCI sea-ice-thickness L2P/L3C files through THREDDS.
+
+    If no year bounds are supplied, only the newest available year for each
+    level/sensor is checked. This makes the monthly update inexpensive while the
+    CLI can still backfill an explicit year range.
+    """
+    jobs: list[DownloadJob] = []
+    parsed_root = urlparse(catalog_root)
+    file_server_root = f"{parsed_root.scheme}://{parsed_root.netloc}/thredds/fileServer/"
+
+    for level in levels:
+        for sensor in sensors:
+            hemi_catalog = (
+                f"{catalog_root.rstrip('/')}/{level}/{sensor}/{version}/{hemisphere}/catalog.html"
+            )
+            try:
+                year_catalogs = _thredds_subcatalogs(hemi_catalog)
+            except HTTPError as exc:
+                print(f"WARNING: cannot list ESA CCI SIT URL {hemi_catalog}: {exc}", file=sys.stderr)
+                continue
+            year_items: list[tuple[int, str]] = []
+            for url in year_catalogs:
+                match = re.search(r"/(\d{4})/catalog\.html$", url)
+                if match:
+                    year_items.append((int(match.group(1)), url))
+            if not year_items:
+                continue
+            if start_year is None and end_year is None:
+                newest = max(year for year, _ in year_items)
+                year_items = [(year, url) for year, url in year_items if year == newest]
+            else:
+                lower = start_year if start_year is not None else min(year for year, _ in year_items)
+                upper = end_year if end_year is not None else max(year for year, _ in year_items)
+                year_items = [(year, url) for year, url in year_items if lower <= year <= upper]
+
+            for year, year_catalog in year_items:
+                catalogs = [year_catalog]
+                if level.upper() == "L2P":
+                    catalogs = _thredds_subcatalogs(year_catalog)
+                for catalog in catalogs:
+                    for dataset_id in _thredds_dataset_ids(catalog):
+                        name = Path(dataset_id).name
+                        relative = Path(level) / sensor / version / hemisphere / f"{year:04d}"
+                        month_match = re.search(r"/(\d{2})/[^/]+\.nc$", dataset_id)
+                        if month_match:
+                            relative = relative / month_match.group(1)
+                        jobs.append(
+                            DownloadJob(
+                                urljoin(file_server_root, dataset_id),
+                                Path(dest_root) / "ESA" / "CCI" / "thickness" / relative / name,
+                            )
+                        )
+    return sorted({str(job.dest): job for job in jobs}.values(), key=lambda job: str(job.dest))
 
 def choose_yearly_daily_aggregate(files: list[str], grid: str, year: int) -> str | None:
     rx = re.compile(rf"sic_{grid}_{year}0101-{year}\d{{4}}_v\d{{2}}r\d{{2}}\.nc$")
@@ -199,11 +331,15 @@ def download_jobs(jobs: list[DownloadJob], *, workers: int = 4, retries: int = 4
     return 1 if failed else 0
 
 def download_nsidc_g02202(**kwargs) -> int:
-    jobs = build_nsidc_g02202_jobs(**kwargs)
-    manifest_file = kwargs.get("manifest_file")
+    options = dict(kwargs)
+    manifest_file = options.pop("manifest_file", None)
+    workers = options.pop("workers", 4)
+    retries = options.pop("retries", 4)
+    min_bytes = options.pop("min_bytes", 10_000)
+    jobs = build_nsidc_g02202_jobs(**options)
     if manifest_file:
         write_manifest(jobs, Path(manifest_file))
-    return download_jobs(jobs)
+    return download_jobs(jobs, workers=workers, retries=retries, min_bytes=min_bytes)
 
 def nsidc_cli(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Discover and download available NSIDC G02202 files.")
@@ -241,3 +377,72 @@ def nsidc_cli(argv: list[str] | None = None) -> int:
             print(f"{job.url}\t{job.dest}")
         return 0
     return download_jobs(jobs, workers = args.workers, retries = args.retries, min_bytes = args.min_bytes)
+
+
+def bremen_cli(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Download University of Bremen AMSR2 Antarctic SIC files.")
+    p.add_argument("--dest-root", required=True, type=Path)
+    p.add_argument("--year", required=True, type=int)
+    p.add_argument("--months", nargs="+", required=True, type=int, choices=range(1, 13))
+    p.add_argument("--base-url", default="https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath")
+    p.add_argument("--resolution", default="s6250")
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--retries", type=int, default=4)
+    p.add_argument("--min-bytes", type=int, default=10_000)
+    p.add_argument("--manifest-file", type=Path, default=None)
+    p.add_argument("--dry-run", action="store_true")
+    args = p.parse_args(argv)
+    jobs = build_bremen_amsr2_jobs(
+        dest_root=args.dest_root,
+        year=args.year,
+        months=args.months,
+        base_url=args.base_url,
+        resolution=args.resolution,
+    )
+    print(f"Planned files: {len(jobs)}")
+    if args.manifest_file:
+        write_manifest(jobs, args.manifest_file)
+    if args.dry_run:
+        for job in jobs:
+            print(f"{job.url}\t{job.dest}")
+        return 0
+    return download_jobs(jobs, workers=args.workers, retries=args.retries, min_bytes=args.min_bytes)
+
+
+def esa_cci_sit_cli(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Update ESA CCI L2P/L3C sea-ice-thickness files.")
+    p.add_argument("--dest-root", required=True, type=Path)
+    p.add_argument("--levels", nargs="+", choices=["L2P", "L3C"], default=["L2P", "L3C"])
+    p.add_argument(
+        "--sensors",
+        nargs="+",
+        choices=["ers2", "envisat", "cryosat2", "sentinel3a", "sentinel3b"],
+        default=["sentinel3a", "sentinel3b"],
+    )
+    p.add_argument("--hemisphere", choices=["NH", "SH"], default="SH")
+    p.add_argument("--version", default="v4.0")
+    p.add_argument("--start-year", type=int, default=None)
+    p.add_argument("--end-year", type=int, default=None)
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--retries", type=int, default=4)
+    p.add_argument("--min-bytes", type=int, default=10_000)
+    p.add_argument("--manifest-file", type=Path, default=None)
+    p.add_argument("--dry-run", action="store_true")
+    args = p.parse_args(argv)
+    jobs = build_esa_cci_sit_jobs(
+        dest_root=args.dest_root,
+        levels=args.levels,
+        sensors=args.sensors,
+        hemisphere=args.hemisphere,
+        version=args.version,
+        start_year=args.start_year,
+        end_year=args.end_year,
+    )
+    print(f"Planned files: {len(jobs)}")
+    if args.manifest_file:
+        write_manifest(jobs, args.manifest_file)
+    if args.dry_run:
+        for job in jobs:
+            print(f"{job.url}\t{job.dest}")
+        return 0
+    return download_jobs(jobs, workers=args.workers, retries=args.retries, min_bytes=args.min_bytes)

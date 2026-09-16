@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 from floes.config import default_config
@@ -58,6 +59,53 @@ def test_daily_nsidc_reader_prefers_latest_version_per_year(tmp_path: Path) -> N
 
     assert result.sizes["time"] == 2
     assert float(result["SIE"].isel(time=0)) == 4.0
+
+
+def test_nsidc_reader_prefers_gridded_g02202_archive(tmp_path: Path) -> None:
+    root = tmp_path / "SeaIce"
+    version = root / "NSIDC" / "G02202_V6" / "south"
+    aggregate = version / "aggregate"
+    ancillary = version / "ancillary"
+    aggregate.mkdir(parents=True)
+    ancillary.mkdir(parents=True)
+    longitude = [[0.0, 1.0], [0.0, 1.0]]
+    latitude = [[-70.0, -70.0], [-71.0, -71.0]]
+    xr.Dataset(
+        {
+            "cdr_seaice_conc_monthly": (
+                ("time", "y", "x"),
+                [[[0.0, 0.5], [1.0, 0.2]]],
+                {"units": "1"},
+            ),
+            "longitude": (("y", "x"), longitude),
+            "latitude": (("y", "x"), latitude),
+        },
+        coords={"time": [pd.Timestamp("2026-08-01")]},
+    ).to_netcdf(aggregate / "sic_pss25_197811-202608_v06r00.nc")
+    xr.Dataset(
+        {
+            "cdr_seaice_conc": (
+                ("time", "y", "x"),
+                [[[0.0, 0.5], [1.0, 0.2]], [[0.0, 0.0], [1.0, 0.0]]],
+                {"units": "1"},
+            ),
+            "longitude": (("y", "x"), longitude),
+            "latitude": (("y", "x"), latitude),
+        },
+        coords={"time": pd.date_range("2026-08-01", periods=2, freq="D")},
+    ).to_netcdf(aggregate / "sic_pss25_20260101-20260802_v06r00.nc")
+    xr.Dataset(
+        {"cell_area": (("y", "x"), [[1.0e6, 1.0e6], [1.0e6, 1.0e6]], {"units": "m2"})}
+    ).to_netcdf(ancillary / "G02202-ancillary-pss25-v06r00.nc")
+
+    reader = NSIDCReader(default_config(seaice_root=root, gadi_base=tmp_path / "unused", chunks=None))
+    sic = reader.sic()
+    daily = reader.daily_total_sia_sie()
+
+    assert sic.sizes["time"] == 1
+    assert "longitude" in sic.coords and "latitude" in sic.coords
+    assert daily.sizes["time"] == 2
+    assert np.isclose(float(daily["SIE"].isel(time=0)), 3.0e-6)
 
 
 def _write_era5_component(root: Path, family: str, code: str, variable: str, stamp: str, value: float) -> None:

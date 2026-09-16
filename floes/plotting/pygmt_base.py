@@ -27,7 +27,7 @@ def infer_lon_lat(da: xr.DataArray, lon_name: str | None = None, lat_name: str |
 def has_curvilinear_lon_lat(da: xr.DataArray) -> bool:
     """Return True when ``da`` carries two-dimensional lon/lat coordinates."""
     lon, lat = infer_lon_lat(da)
-    return lon is not None and lat is not None and (lon.ndim == 2 or lat.ndim == 2)
+    return lon is not None and lat is not None and lon.ndim == 2 and lat.ndim == 2
 
 def write_xyz_from_curvilinear(da: xr.DataArray, path: Path, *, lon_name: str | None = None, lat_name: str | None = None, stride: int = 1) -> Path:
     """Write lon/lat/value triples for PyGMT plotting from curvilinear grids."""
