@@ -19,7 +19,7 @@ from floes.observations.nsidc import NSIDCReader  # noqa: E402
 from floes.observations.ocean import OceanReader  # noqa: E402
 from floes.observations.oisst import OISSTReader  # noqa: E402
 from floes.observations.sea_ice import annual_sie_maximum  # noqa: E402
-from floes.plotting.gallery import write_gallery  # noqa: E402
+from floes.plotting.gallery import GalleryFigure, write_gallery  # noqa: E402
 from floes.plotting.monthly import MonthlySeaIceChatPlotter  # noqa: E402
 from floes.plotting.nsidc_diagnostics import NSIDCDiagnosticPlotter  # noqa: E402
 
@@ -131,13 +131,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dry_run:
         print("Dry run only; no figures generated.")
-        write_gallery(fig_dir=cfg.figure_root, md_path=cfg.markdown_gallery)
         return 0
 
     keep_going = not args.strict
     plotter = MonthlySeaIceChatPlotter(cfg)
     nsidc = NSIDCReader(cfg, hemisphere="SH", daily_base=args.nsidc_daily_base)
     monthly_totals: dict[str, object] = {}
+    map_sic_cache: dict[str, object] = {}
 
     def total_for(hemisphere: str):
         hemisphere = hemisphere.upper()
@@ -146,8 +146,28 @@ def main(argv: list[str] | None = None) -> int:
             monthly_totals[hemisphere] = NSIDCReader(cfg, hemisphere=hemisphere).total_sia_sie().compute()
         return monthly_totals[hemisphere]
 
+    def latest_map_sic():
+        if "dataset" not in map_sic_cache:
+            map_sic_cache["dataset"] = nsidc.sic_month_and_climatology(
+                year=args.year,
+                month=args.month,
+                fallback_latest=True,
+            ).compute()
+        return map_sic_cache["dataset"]
+
+    def ice_edge_for(year: int, month: int):
+        latest = latest_map_sic()
+        latest_year, latest_month, _ = _actual_ym(latest, args.year, args.month)
+        if (year, month) == (latest_year, latest_month):
+            return latest["sic"]
+        return nsidc.sic_month_and_climatology(
+            year=year,
+            month=month,
+            fallback_latest=False,
+        )["sic"].compute()
+
     def nsidc_sic_map():
-        ds = nsidc.sic_month_and_climatology(year=args.year, month=args.month, fallback_latest=True)
+        ds = latest_map_sic()
         y, m, exact = _actual_ym(ds, args.year, args.month)
         if not exact:
             print(f"Using latest available NSIDC month {y:04d}-{m:02d} for requested {args.year:04d}-{args.month:02d}.")
@@ -161,10 +181,17 @@ def main(argv: list[str] | None = None) -> int:
         out = cfg.figure_root / "NSIDC_SH_total_SIA_SIE_monthly.png"
         return plotter.plot_total_sia_sie(ds, output=out)
 
-    _run_step("NSIDC SIC anomaly map", nsidc_sic_map, keep_going=keep_going, manifest=manifest, verbose=args.verbose)
+    nsidc_sic_path = _run_step(
+        "NSIDC SIC anomaly map", nsidc_sic_map, keep_going=keep_going, manifest=manifest, verbose=args.verbose
+    )
     _run_step(
         "NSIDC total SIA/SIE time series", nsidc_sia_ts, keep_going=keep_going, manifest=manifest, verbose=args.verbose
     )
+
+    will_sia_path = None
+    will_sie_by_year_path = None
+    will_sie_max_path = None
+    will_hemisphere_paths = None
 
     if not args.skip_will_suite:
         diagnostics = NSIDCDiagnosticPlotter(
@@ -178,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
             return diagnostics.plot_monthly_anomaly_timeseries(
                 ds["SIA"],
                 output=cfg.figure_root / "NSIDC_SIA_cdr_monthly_tplot_absolute.png",
+                highlight_year=args.year,
             )
 
         def will_sia_standardised_anomaly():
@@ -186,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
                 ds["SIA"],
                 output=cfg.figure_root / "NSIDC_SIA_cdr_monthly_tplot_standardised.png",
                 standardised=True,
+                highlight_year=args.year,
             )
 
         def will_hemisphere_comparison():
@@ -211,14 +240,13 @@ def main(argv: list[str] | None = None) -> int:
             daily = nsidc.daily_total_sia_sie()
             maxima = annual_sie_maximum(daily["SIE"])
             maxima.to_netcdf(cfg.figure_root / "NSIDC_SH_SIE_annual_maximum.nc")
-            highlight = tuple(year for year in (args.year - 1, args.year) if year >= 1979)
             return diagnostics.plot_sie_maximum_vs_day(
                 maxima,
                 output=cfg.figure_root / "NSIDC_SIEmax_vs_day-of-max.png",
-                highlight_years=highlight,
+                current_year=args.year,
             )
 
-        _run_step(
+        will_sia_path = _run_step(
             "Will: SH monthly SIA anomaly",
             will_sia_anomaly,
             keep_going=keep_going,
@@ -232,21 +260,21 @@ def main(argv: list[str] | None = None) -> int:
             manifest=manifest,
             verbose=args.verbose,
         )
-        _run_step(
+        will_hemisphere_paths = _run_step(
             "Will: Arctic-Antarctic SIE comparison",
             will_hemisphere_comparison,
             keep_going=keep_going,
             manifest=manifest,
             verbose=args.verbose,
         )
-        _run_step(
+        will_sie_by_year_path = _run_step(
             "Will: SH monthly SIE anomalies by year",
             will_sie_anomalies_by_year,
             keep_going=keep_going,
             manifest=manifest,
             verbose=args.verbose,
         )
-        _run_step(
+        will_sie_max_path = _run_step(
             "Will: SH SIE maximum versus date",
             will_sie_maximum,
             keep_going=keep_going,
@@ -255,34 +283,52 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     def oisst_map():
-        da = OISSTReader(cfg).anomaly_field(year=args.year, month=args.month, fallback_latest=True)
-        y, m, exact = _actual_ym(da, args.year, args.month)
+        sic = latest_map_sic()
+        target_year, target_month, _ = _actual_ym(sic, args.year, args.month)
+        da = OISSTReader(cfg).anomaly_field(year=target_year, month=target_month, fallback_latest=True)
+        y, m, exact = _actual_ym(da, target_year, target_month)
         if not exact:
-            print(f"Using latest available OISST month {y:04d}-{m:02d} for requested {args.year:04d}-{args.month:02d}.")
+            print(f"Using latest available OISST month {y:04d}-{m:02d} for requested {target_year:04d}-{target_month:02d}.")
         out = cfg.figure_root / f"OISST_global_sst_anomaly_{y:04d}{m:02d}.png"
-        suffix = "" if exact else f" (latest available; requested {args.year:04d}-{args.month:02d})"
-        return plotter.plot_gridded_anomaly(
-            da, output=out, title=f"OISST SST anomaly, {y:04d}-{m:02d}{suffix}", limit=3.0, units_label="degC"
-        )
-
-    def era5_wind_map():
-        da = ERA5Reader(cfg).wind_speed_month(year=args.year, month=args.month, fallback_latest=True)
-        y, m, exact = _actual_ym(da, args.year, args.month)
-        if not exact:
-            print(
-                f"Using latest available ERA5 wind month {y:04d}-{m:02d} "
-                f"for requested {args.year:04d}-{args.month:02d}."
-            )
-        out = cfg.figure_root / f"ERA5_wind_SIE_SH_{y:04d}{m:02d}.png"
-        suffix = "" if exact else f" (latest available; requested {args.year:04d}-{args.month:02d})"
-        source = da.attrs.get("source", "ERA5")
         return plotter.plot_gridded_anomaly(
             da,
             output=out,
-            title=f"{source} wind speed, {y:04d}-{m:02d}{suffix}",
-            cpt="turbo",
-            limit=20.0,
-            units_label="m s-1",
+            title=f"{y:04d}-{m:02d}",
+            cpt="polar",
+            value_range=(-2.0, 2.0),
+            colorbar_label="SST anomaly",
+            colorbar_unit="degC",
+            ice_edge=ice_edge_for(y, m),
+        )
+
+    def era5_wind_map():
+        sic = latest_map_sic()
+        target_year, target_month, _ = _actual_ym(sic, args.year, args.month)
+        fields = ERA5Reader(cfg).wind_mslp_month(
+            year=target_year,
+            month=target_month,
+            fallback_latest=True,
+        )
+        y, m, exact = _actual_ym(fields, target_year, target_month)
+        if not exact:
+            print(
+                f"Using latest available ERA5 wind month {y:04d}-{m:02d} "
+                f"for requested {target_year:04d}-{target_month:02d}."
+            )
+        out = cfg.figure_root / f"ERA5_wind_SIE_SH_{y:04d}{m:02d}.png"
+        return plotter.plot_gridded_anomaly(
+            fields["wind_speed"],
+            output=out,
+            title=f"{y:04d}-{m:02d}",
+            cpt="cmocean/speed",
+            value_range=(0.0, 40.0),
+            colorbar_label="wind speed",
+            colorbar_unit="m/s",
+            ice_edge=ice_edge_for(y, m),
+            contour=fields["mslp"],
+            contour_interval=4.0,
+            contour_annotation=8.0,
+            contour_pen="0.45p,gray40",
         )
 
     def oras_hovmoller_scaffold():
@@ -331,8 +377,12 @@ def main(argv: list[str] | None = None) -> int:
         hov.to_netcdf(nc)
         return nc
 
-    _run_step("OISST SST anomaly map", oisst_map, keep_going=True, manifest=manifest, verbose=args.verbose)
-    _run_step("ERA5 wind map", era5_wind_map, keep_going=True, manifest=manifest, verbose=args.verbose)
+    oisst_path = _run_step(
+        "OISST SST anomaly map", oisst_map, keep_going=True, manifest=manifest, verbose=args.verbose
+    )
+    era5_path = _run_step(
+        "ERA5 wind map", era5_wind_map, keep_going=True, manifest=manifest, verbose=args.verbose
+    )
     _run_step(
         "ORAS5 depth-time diagnostic", oras_hovmoller_scaffold, keep_going=True, manifest=manifest, verbose=args.verbose
     )
@@ -340,7 +390,65 @@ def main(argv: list[str] | None = None) -> int:
         "EN4 depth-time diagnostic", en4_hovmoller_scaffold, keep_going=True, manifest=manifest, verbose=args.verbose
     )
 
-    gallery = write_gallery(fig_dir=cfg.figure_root, md_path=cfg.markdown_gallery)
+    gallery_figures: list[GalleryFigure] = []
+    if will_sie_by_year_path:
+        gallery_figures.append(
+            GalleryFigure(Path(will_sie_by_year_path), "NSIDC SIE cdr monthly anoms byyear")
+        )
+    if will_sia_path:
+        gallery_figures.append(
+            GalleryFigure(Path(will_sia_path), "NSIDC SIA cdr monthly tplot absolute")
+        )
+    if nsidc_sic_path:
+        y, m, _ = _actual_ym(latest_map_sic(), args.year, args.month)
+        gallery_figures.append(
+            GalleryFigure(Path(nsidc_sic_path), f"NSIDC SH sic anomaly — {y:04d}-{m:02d}")
+        )
+    if oisst_path:
+        name = Path(oisst_path).stem
+        stamp = name.rsplit("_", 1)[-1]
+        gallery_figures.append(
+            GalleryFigure(
+                Path(oisst_path),
+                f"OISST global SST anomaly and NSIDC SIE — {stamp[:4]}-{stamp[4:]}",
+            )
+        )
+    if era5_path:
+        name = Path(era5_path).stem
+        stamp = name.rsplit("_", 1)[-1]
+        gallery_figures.append(
+            GalleryFigure(
+                Path(era5_path),
+                f"ERA5 wind speed, MSLP and NSIDC SIE — {stamp[:4]}-{stamp[4:]}",
+            )
+        )
+    if will_sie_max_path:
+        gallery_figures.append(GalleryFigure(Path(will_sie_max_path), "NSIDC SIEmax vs day-of-max"))
+    if will_hemisphere_paths:
+        monthly_path = Path(will_hemisphere_paths[1])
+        gallery_figures.append(
+            GalleryFigure(
+                monthly_path,
+                "NSIDC Arctic vs Antarctic monthly anomalies",
+                description=(
+                    "The left panel shows the combined Arctic and Antarctic monthly SIE anomaly: values below zero "
+                    "mean global sea-ice extent was below its calendar-month climatology. In the right panel, each "
+                    "point is one month; the lower-left quadrant means both hemispheres were below average, while "
+                    "the opposite-sign quadrants show compensation between hemispheres. Black denotes months before "
+                    f"{args.comparison_split_year}; red denotes {args.comparison_split_year} onward."
+                ),
+                caption=(
+                    f"Constructed from separate Arctic and Antarctic calendar-month anomalies relative to the "
+                    f"{args.will_clim_start}–{args.will_clim_end} NSIDC climatology; the hemispheric anomalies are "
+                    "summed for the global series."
+                ),
+            )
+        )
+    gallery = write_gallery(
+        fig_dir=cfg.figure_root,
+        md_path=cfg.markdown_gallery,
+        figures=gallery_figures,
+    )
     manifest_path = cfg.figure_root / f"floes_manifest_{args.year:04d}{args.month:02d}.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(f"\nWrote gallery : {gallery}")

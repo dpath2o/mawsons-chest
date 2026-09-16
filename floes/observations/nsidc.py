@@ -84,6 +84,9 @@ class NSIDCReader:
         for name in ("cdr_seaice_conc_monthly", "cdr_seaice_conc", "ice_conc", "seaice_conc", "sic"):
             if name in ds:
                 out = standardise_sic(ds[name])
+                for coord_name in ("longitude", "latitude", "lon", "lat"):
+                    if coord_name in ds and coord_name not in out.coords:
+                        out = out.assign_coords({coord_name: ds[coord_name]})
                 out.name = "sic"
                 return out
         raise KeyError(f"No recognised SIC variable in NSIDC dataset: {list(ds.data_vars)}")

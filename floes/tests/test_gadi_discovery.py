@@ -69,8 +69,13 @@ def _write_era5_component(root: Path, family: str, code: str, variable: str, sta
         filename = f"{code}_{family}_oper_sfc_{stamp}-{stamp[:6]}{end:02d}.nc"
     else:
         filename = f"{code}_{family}_oper_sfc_{stamp}-{stamp}.nc"
+    data = xr.DataArray(
+        [[[value], [value]]],
+        dims=("time", "latitude", "longitude"),
+        attrs={"units": "Pa" if variable == "msl" else "m s-1"},
+    )
     xr.Dataset(
-        {variable: (("time", "latitude", "longitude"), [[[value], [value]]])},
+        {variable: data},
         coords={
             "time": [pd.Timestamp(stamp)],
             "latitude": [-90.0, -45.0],
@@ -83,6 +88,7 @@ def test_era5_reader_uses_era5t_for_current_month_and_final_when_available(tmp_p
     for family, stamp, uvalue in (("era5t", "20260801", 3.0), ("era5", "20260701", 6.0), ("era5t", "20260701", 8.0)):
         _write_era5_component(tmp_path, family, "10u", "u10", stamp, uvalue)
         _write_era5_component(tmp_path, family, "10v", "v10", stamp, 4.0 if stamp.startswith("202608") else 8.0)
+        _write_era5_component(tmp_path, family, "msl", "msl", stamp, 100_000.0)
 
     reader = ERA5Reader(default_config(era5_root=tmp_path, chunks=None))
     august = reader.wind_speed_month(year=2026, month=8)
@@ -92,3 +98,8 @@ def test_era5_reader_uses_era5t_for_current_month_and_final_when_available(tmp_p
     assert float(august.isel(latitude=0, longitude=0)) == 5.0
     assert july.attrs["source"] == "ERA5"
     assert float(july.isel(latitude=0, longitude=0)) == 10.0
+
+    august_fields = reader.wind_mslp_month(year=2026, month=8)
+    assert august_fields.attrs["source"] == "ERA5T"
+    assert set(august_fields.data_vars) == {"wind_speed", "mslp"}
+    assert float(august_fields["mslp"].isel(latitude=0, longitude=0)) == 1000.0

@@ -26,7 +26,7 @@ class ERA5Reader:
     config: FloesConfig
     latmax_sh: float = -45.0
 
-    _COMPONENTS = {"u10": "10u", "v10": "10v"}
+    _COMPONENTS = {"u10": "10u", "v10": "10v", "msl": "msl"}
 
     def _component_files(self, family: str, name: str, year: int, month: int) -> list[Path]:
         code = self._COMPONENTS[name]
@@ -53,14 +53,17 @@ class ERA5Reader:
         return months
 
     def _select_month(
-        self, year: int, month: int, fallback_latest: bool
-    ) -> tuple[str, int, int, list[Path], list[Path], bool]:
+        self,
+        year: int,
+        month: int,
+        fallback_latest: bool,
+        names: tuple[str, ...] = ("u10", "v10"),
+    ) -> tuple[str, int, int, dict[str, list[Path]], bool]:
         requested = (int(year), int(month))
         for family in ("era5", "era5t"):
-            ufiles = self._component_files(family, "u10", *requested)
-            vfiles = self._component_files(family, "v10", *requested)
-            if ufiles and vfiles:
-                return family, *requested, ufiles, vfiles, True
+            files = {name: self._component_files(family, name, *requested) for name in names}
+            if all(files.values()):
+                return family, *requested, files, True
 
         if not fallback_latest:
             raise FileNotFoundError(
@@ -70,7 +73,8 @@ class ERA5Reader:
 
         candidates: list[tuple[tuple[int, int], int, str]] = []
         for family, priority in (("era5", 1), ("era5t", 0)):
-            common = self._available_months(family, "u10") & self._available_months(family, "v10")
+            available = [self._available_months(family, name) for name in names]
+            common = set.intersection(*available)
             candidates.extend((ym, priority, family) for ym in common if ym <= requested)
         if not candidates:
             raise FileNotFoundError(
@@ -78,9 +82,11 @@ class ERA5Reader:
                 f"under {self.config.era5_root}"
             )
         (selected_year, selected_month), _, family = max(candidates)
-        ufiles = self._component_files(family, "u10", selected_year, selected_month)
-        vfiles = self._component_files(family, "v10", selected_year, selected_month)
-        return family, selected_year, selected_month, ufiles, vfiles, False
+        files = {
+            name: self._component_files(family, name, selected_year, selected_month)
+            for name in names
+        }
+        return family, selected_year, selected_month, files, False
 
     def _open_component(self, paths: list[Path], name: str) -> xr.DataArray:
         ds = xr.open_mfdataset(
@@ -106,11 +112,11 @@ class ERA5Reader:
 
     def wind_speed_month(self, *, year: int, month: int, fallback_latest: bool = True) -> xr.DataArray:
         requested_year, requested_month = int(year), int(month)
-        family, year, month, ufiles, vfiles, exact = self._select_month(
+        family, year, month, files, exact = self._select_month(
             requested_year, requested_month, fallback_latest
         )
-        u = self._open_component(ufiles, "u10")
-        v = self._open_component(vfiles, "v10")
+        u = self._open_component(files["u10"], "u10")
+        v = self._open_component(files["v10"], "v10")
         u, v = xr.align(u, v, join="inner")
         wind = self._southern_ocean((u**2 + v**2) ** 0.5)
         if "time" in wind.dims:
@@ -129,3 +135,43 @@ class ERA5Reader:
             }
         )
         return wind
+
+    def wind_mslp_month(self, *, year: int, month: int, fallback_latest: bool = True) -> xr.Dataset:
+        """Return monthly-mean 10 m wind speed and MSLP from one ERA5 family/month."""
+        requested_year, requested_month = int(year), int(month)
+        family, year, month, files, exact = self._select_month(
+            requested_year,
+            requested_month,
+            fallback_latest,
+            names=("u10", "v10", "msl"),
+        )
+        u = self._open_component(files["u10"], "u10")
+        v = self._open_component(files["v10"], "v10")
+        msl = self._open_component(files["msl"], "msl")
+        u, v, msl = xr.align(u, v, msl, join="inner")
+
+        wind = self._southern_ocean((u**2 + v**2) ** 0.5)
+        msl = self._southern_ocean(msl)
+        if "time" in wind.dims:
+            wind = wind.mean("time", skipna=True)
+        if "time" in msl.dims:
+            msl = msl.mean("time", skipna=True)
+        # ERA5 stores mean sea-level pressure in Pa; hPa gives readable contour labels.
+        if str(msl.attrs.get("units", "")).lower() in {"pa", "pascal", "pascals"}:
+            msl = msl / 100.0
+        msl.name = "mslp"
+        msl.attrs.update({"long_name": "mean sea-level pressure", "units": "hPa"})
+        wind.name = "wind_speed"
+        wind.attrs.update({"long_name": "10 m wind speed", "units": u.attrs.get("units", "m s-1")})
+
+        attrs = {
+            "source": "ERA5" if family == "era5" else "ERA5T",
+            "requested_year": requested_year,
+            "requested_month": requested_month,
+            "selected_year": int(year),
+            "selected_month": int(month),
+            "exact_requested_month": bool(exact),
+        }
+        wind.attrs.update(attrs)
+        msl.attrs.update(attrs)
+        return xr.Dataset({"wind_speed": wind, "mslp": msl}, attrs=attrs)

@@ -8,8 +8,15 @@ import xarray as xr
 
 from floes.config import FloesConfig
 
-from .palettes import make_symmetric_cpt
-from .pygmt_base import require_pygmt, south_polar_projection, south_polar_region, write_xyz_from_curvilinear
+from .palettes import make_cpt, make_symmetric_cpt
+from .pygmt_base import (
+    has_curvilinear_lon_lat,
+    plot_geographic_contour,
+    require_pygmt,
+    south_polar_projection,
+    south_polar_region,
+    write_xyz_from_curvilinear,
+)
 
 
 def _selected_ym_from_attrs(
@@ -31,6 +38,41 @@ class MonthlySeaIceChatPlotter:
         pygmt = require_pygmt()
         return pygmt, pygmt.Figure()
 
+    def _plot_field(
+        self,
+        fig,
+        da: xr.DataArray,
+        *,
+        cpt_path: Path,
+        title: str,
+        region: list[float],
+        projection: str,
+        output: Path,
+        stride: int,
+    ) -> None:
+        """Plot regular grids as rasters and curvilinear grids as lon/lat cells."""
+        field = da.squeeze()
+        if has_curvilinear_lon_lat(field):
+            xyz = output.with_suffix(f".{field.name or 'field'}.xyz")
+            write_xyz_from_curvilinear(field, xyz, stride=stride)
+            fig.basemap(region=region, projection=projection, frame=["afg", f"+t{title}"])
+            fig.plot(
+                data=str(xyz),
+                style=f"s{0.04 * stride:.3f}c",
+                cmap=str(cpt_path),
+                fill="+z",
+                pen=None,
+            )
+        else:
+            fig.grdimage(
+                field,
+                region=region,
+                projection=projection,
+                cmap=str(cpt_path),
+                frame=["afg", f"+t{title}"],
+            )
+        fig.coast(shorelines="0.25p,black", land="gray80")
+
     def plot_sic_anomaly_map(
         self, ds: xr.Dataset, *, year: int, month: int, output: Path, title: str | None = None, stride: int = 1
     ) -> Path:
@@ -41,38 +83,25 @@ class MonthlySeaIceChatPlotter:
         region = south_polar_region(self.config.latmax_sh)
         projection = south_polar_projection("16c")
         sy, sm = _selected_ym_from_attrs(ds, year, month)
-        suffix = (
-            ""
-            if ds.attrs.get("exact_requested_month", True)
-            else f" (latest available; requested {year:04d}-{month:02d})"
-        )
-        title = title or f"NSIDC SIC anomaly, {sy:04d}-{sm:02d}{suffix}"
+        title = title or f"{sy:04d}-{sm:02d}"
         anom = ds["sic_anom"].squeeze()
         cpt_path = output.with_suffix(".sic_anom.cpt")
         make_symmetric_cpt(pygmt, cmap="polar", limit=1.0, output=cpt_path, series_step=0.1)
-        try:
-            fig.grdimage(anom, region=region, projection=projection, cmap=str(cpt_path), frame=["afg", f"+t{title}"])
-            fig.coast(shorelines="0.25p,black", land="gray80")
-        except Exception:
-            xyz = output.with_suffix(".xyz")
-            write_xyz_from_curvilinear(anom, xyz, stride=stride)
-            fig.coast(
-                region=region,
-                projection=projection,
-                land="gray80",
-                water="white",
-                shorelines="0.25p,black",
-                frame=["afg", f"+t{title}"],
-            )
-            fig.plot(data=str(xyz), style="s0.035c", cmap=str(cpt_path), fill="+z", pen=None)
+        self._plot_field(
+            fig,
+            anom,
+            cpt_path=cpt_path,
+            title=title,
+            region=region,
+            projection=projection,
+            output=output,
+            stride=stride,
+        )
         for name, pen in (("sic_clim", "1.0p,violetred3"), ("sic", "1.0p,black")):
             if name not in ds:
                 continue
-            try:
-                fig.grdcontour(ds[name].squeeze(), levels=[self.config.sic_threshold], pen=pen)
-            except Exception:
-                pass
-        fig.colorbar(frame=['x+l"SIC anomaly"', 'y+l"fraction"'])
+            plot_geographic_contour(fig, ds[name], level=self.config.sic_threshold, pen=pen)
+        fig.colorbar(frame=["x+lSIC anomaly", "y+lfraction"])
         fig.savefig(str(output), dpi=200)
         return output
 
@@ -121,6 +150,14 @@ class MonthlySeaIceChatPlotter:
         cpt: str = "polar",
         limit: float = 3.0,
         units_label: str = "anomaly",
+        value_range: tuple[float, float] | None = None,
+        colorbar_label: str | None = None,
+        colorbar_unit: str | None = None,
+        ice_edge: xr.DataArray | None = None,
+        contour: xr.DataArray | None = None,
+        contour_interval: float | None = None,
+        contour_annotation: float | str | None = None,
+        contour_pen: str = "0.45p,gray40",
         projection_width: str = "16c",
         stride: int = 1,
     ) -> Path:
@@ -131,24 +168,33 @@ class MonthlySeaIceChatPlotter:
         region = south_polar_region(self.config.latmax_sh)
         projection = south_polar_projection(projection_width)
         cpt_path = output.with_suffix(".cpt")
-        make_symmetric_cpt(pygmt, cmap=cpt, limit=limit, output=cpt_path)
-        try:
-            fig.grdimage(
-                da.squeeze(), region=region, projection=projection, cmap=str(cpt_path), frame=["afg", f"+t{title}"]
+        if value_range is None:
+            make_symmetric_cpt(pygmt, cmap=cpt, limit=limit, output=cpt_path)
+        else:
+            make_cpt(pygmt, cmap=cpt, minimum=value_range[0], maximum=value_range[1], output=cpt_path)
+        self._plot_field(
+            fig,
+            da,
+            cpt_path=cpt_path,
+            title=title,
+            region=region,
+            projection=projection,
+            output=output,
+            stride=stride,
+        )
+        if contour is not None:
+            fig.grdcontour(
+                grid=contour.squeeze(),
+                levels=contour_interval,
+                annotation=contour_annotation,
+                pen=contour_pen,
             )
-            fig.coast(shorelines="0.25p,black", land="gray80")
-        except Exception:
-            xyz = output.with_suffix(".xyz")
-            write_xyz_from_curvilinear(da.squeeze(), xyz, stride=stride)
-            fig.coast(
-                region=region,
-                projection=projection,
-                land="gray80",
-                water="white",
-                shorelines="0.25p,black",
-                frame=["afg", f"+t{title}"],
-            )
-            fig.plot(data=str(xyz), style="s0.035c", cmap=str(cpt_path), fill="+z", pen=None)
-        fig.colorbar(frame=[f'x+l"{units_label}"'])
+        if ice_edge is not None:
+            plot_geographic_contour(fig, ice_edge, level=self.config.sic_threshold, pen="1.0p,black")
+        x_label = colorbar_label or units_label
+        frame = [f"x+l{x_label}"]
+        if colorbar_unit:
+            frame.append(f"y+l{colorbar_unit}")
+        fig.colorbar(frame=frame)
         fig.savefig(str(output), dpi=200)
         return output

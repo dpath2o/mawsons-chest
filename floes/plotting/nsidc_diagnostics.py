@@ -53,6 +53,7 @@ class NSIDCDiagnosticPlotter:
         output: Path,
         standardised: bool = False,
         hemisphere_name: str = "Southern Hemisphere",
+        highlight_year: int | None = None,
     ) -> Path:
         if standardised:
             values = standardised_monthly_anomalies(
@@ -65,10 +66,15 @@ class NSIDCDiagnosticPlotter:
 
         x = _decimal_year(values["time"])
         y = np.asarray(values.values, dtype=float)
+        years = pd.DatetimeIndex(values["time"].values).year
+        highlighted = years == highlight_year if highlight_year is not None else np.zeros_like(y, dtype=bool)
+        background = ~highlighted
         plt = _pyplot()
         fig, ax = plt.subplots(figsize=(10, 5.7))
-        ax.fill_between(x, 0, y, where=y >= 0, color="cyan", interpolate=True)
-        ax.fill_between(x, 0, y, where=y < 0, color="orange", interpolate=True)
+        ax.fill_between(x, 0, y, where=(y >= 0) & background, color="cyan", interpolate=True)
+        ax.fill_between(x, 0, y, where=(y < 0) & background, color="orange", interpolate=True)
+        ax.fill_between(x, 0, y, where=(y >= 0) & highlighted, color="purple", interpolate=True)
+        ax.fill_between(x, 0, y, where=(y < 0) & highlighted, color="yellow", interpolate=True)
         ax.plot(x, y, color="black", linewidth=1.0)
         ax.axhline(0, color="0.35", linewidth=0.7)
         if standardised:
@@ -81,6 +87,18 @@ class NSIDCDiagnosticPlotter:
         )
         ax.grid(axis="y", color="0.9", linewidth=0.5)
         ax.margins(x=0)
+        if highlighted.any():
+            from matplotlib.patches import Patch
+
+            ax.legend(
+                handles=[
+                    Patch(facecolor="purple", label=f"{highlight_year} positive"),
+                    Patch(facecolor="yellow", edgecolor="0.4", label=f"{highlight_year} negative"),
+                ],
+                loc="upper left",
+                frameon=False,
+                fontsize=8,
+            )
         return _save(fig, output)
 
     def plot_hemisphere_comparison(
@@ -195,27 +213,40 @@ class NSIDCDiagnosticPlotter:
         maxima: xr.Dataset,
         *,
         output: Path,
-        highlight_years: tuple[int, ...] = (),
+        current_year: int | None = None,
         comparison_year: int = 2014,
     ) -> Path:
         plt = _pyplot()
         fig, ax = plt.subplots(figsize=(6, 5.5))
         ax.scatter(maxima["day_of_max"], maxima["SIE_max"], color="black", s=34)
         available = {int(y) for y in maxima["year"].values}
-        selected = [year for year in highlight_years if year in available]
-        if selected:
-            sel = maxima.sel(year=selected)
-            ax.scatter(sel["day_of_max"], sel["SIE_max"], color="red", s=38, label=", ".join(map(str, selected)))
+        latest_year = current_year if current_year in available else (max(available) if available else None)
+        previous_year = latest_year - 1 if latest_year is not None and latest_year - 1 in available else None
+        if previous_year is not None:
+            sel = maxima.sel(year=previous_year)
+            ax.scatter(sel["day_of_max"], sel["SIE_max"], color="red", s=42, label=str(previous_year))
         if comparison_year in available:
             sel = maxima.sel(year=comparison_year)
             ax.scatter(
                 sel["day_of_max"],
                 sel["SIE_max"],
-                color="cyan",
+                color="royalblue",
                 edgecolor="0.3",
                 linewidth=0.4,
                 s=44,
                 label=str(comparison_year),
+            )
+        if latest_year is not None:
+            sel = maxima.sel(year=latest_year)
+            ax.scatter(
+                sel["day_of_max"],
+                sel["SIE_max"],
+                color="yellow",
+                edgecolor="0.3",
+                linewidth=0.5,
+                s=52,
+                label=str(latest_year),
+                zorder=4,
             )
         ax.set_xlabel("Day of maximum SIE")
         ax.set_ylabel(r"Maximum SIE (million km$^2$)")
@@ -223,9 +254,11 @@ class NSIDCDiagnosticPlotter:
         data_end = maxima.attrs.get("data_end")
         if data_end:
             end = pd.Timestamp(data_end)
-            if end < pd.Timestamp(year=end.year, month=10, day=31):
+            if end.year not in available:
+                title += f"\nData through {end:%d %b %Y}; latest complete maximum {latest_year}"
+            elif end < pd.Timestamp(year=end.year, month=10, day=31):
                 title += f"\n{end.year} is provisional to {end:%d %b}"
         ax.set_title(title)
-        if selected or comparison_year in available:
+        if previous_year is not None or comparison_year in available or latest_year is not None:
             ax.legend(frameon=False, fontsize=8)
         return _save(fig, output)

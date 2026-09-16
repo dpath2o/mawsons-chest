@@ -3,9 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import xarray as xr
 from floes.config import default_config
 from floes.plotting.monthly import MonthlySeaIceChatPlotter
+from floes.plotting.pygmt_base import curvilinear_contour_segments
 
 
 class _FakeFigure:
@@ -39,3 +41,24 @@ def test_total_sia_sie_uses_portable_default_frame_axes(tmp_path: Path) -> None:
 
     assert figure.frame is not None
     assert not any(item in {"WSne", "WSen"} for item in figure.frame)
+
+
+def test_curvilinear_contour_is_returned_in_geographic_coordinates() -> None:
+    values = np.tile(np.arange(5, dtype=float), (5, 1))
+    longitude = np.tile(np.linspace(-40.0, 40.0, 5), (5, 1))
+    latitude = np.tile(np.linspace(-80.0, -60.0, 5)[:, None], (1, 5))
+    field = xr.DataArray(
+        values,
+        dims=("y", "x"),
+        coords={
+            "longitude": (("y", "x"), longitude),
+            "latitude": (("y", "x"), latitude),
+        },
+    )
+
+    segments = curvilinear_contour_segments(field, 2.0)
+
+    assert segments
+    for lon, lat in segments:
+        assert np.all(np.abs(np.diff(lon)) <= 180.0)
+        assert np.all((lat >= -80.0) & (lat <= -60.0))

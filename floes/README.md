@@ -47,10 +47,10 @@ The initial implementation consolidates these legacy/precursor workflows:
 
 The monthly runner prepares the following products when the required data are present:
 
-1. `NSIDC_SH_sic_anomaly_YYYYMM.png` -- Southern Hemisphere SIC anomaly map with climatological and current 15 percent ice-edge overlays.
+1. `NSIDC_SH_sic_anomaly_YYYYMM.png` -- Southern Hemisphere SIC anomaly map with climatological and current 15 percent ice-edge overlays; curvilinear NSIDC fields are rendered from their geographic coordinates.
 2. `NSIDC_SH_total_SIA_SIE_monthly.png` -- total sea-ice area and extent monthly time series.
-3. `OISST_global_sst_anomaly_YYYYMM.png` -- optional OISST anomaly map.
-4. `ERA5_wind_SIE_SH_YYYYMM.png` -- optional Southern Ocean wind map, using final ERA5 where available and ERA5T for the publication-lag window.
+3. `OISST_global_sst_anomaly_YYYYMM.png` -- OISST anomaly map with the matching NSIDC 15 percent ice edge.
+4. `ERA5_wind_SIE_SH_YYYYMM.png` -- Southern Ocean wind speed, monthly MSLP contours and the matching NSIDC 15 percent ice edge, using final ERA5 where available and ERA5T for the publication-lag window.
 5. `ORAS5_votemper_depth_time_SH_latest.nc` -- current, dynamically complete monthly ocean diagnostic scaffold.
 6. `EN4_temperature_depth_time_SH_latest.nc` -- observationally constrained monthly ocean comparison through the latest local EN4 month.
 
@@ -76,6 +76,11 @@ python scripts/update_mthly_sea_ice_sci_chat_figs.py \
 ```
 
 Use `--skip-will-suite` when only the original map and ancillary products are wanted.
+
+The generated markdown is intentionally curated rather than being a directory
+listing. It includes only the latest monthly NSIDC/OISST/ERA5 maps and omits the
+supporting total-SIA/SIE, standardised-anomaly and annual hemispheric-comparison
+figures even though those files continue to be generated.
 
 The daily reader first checks `--nsidc-daily-base`, then falls back to
 `--gadi-base`. It recognises the original `NSIDC/SIE_daily/` layout and
