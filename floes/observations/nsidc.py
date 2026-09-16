@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 import xarray as xr
 
@@ -17,6 +18,29 @@ from .sea_ice import (
     select_year_month,
     standardise_sic,
 )
+
+
+_DAILY_VERSION_RE = re.compile(r"_(\d{4})(?:_v(\d+)r(\d+))?\.nc$")
+
+
+def prefer_latest_daily_versions(files: list[Path]) -> list[Path]:
+    """Keep the highest NSIDC version/revision for each year.
+
+    The shared archive currently contains both v02r00 and v04r00 for 2024;
+    opening both would duplicate every 2024 timestamp.
+    """
+    selected: dict[int, tuple[tuple[int, int], Path]] = {}
+    for path in files:
+        match = _DAILY_VERSION_RE.search(path.name)
+        if not match:
+            continue
+        year = int(match.group(1))
+        version = int(match.group(2)) if match.group(2) is not None else -1
+        revision = int(match.group(3)) if match.group(3) is not None else -1
+        key = (version, revision)
+        if year not in selected or key > selected[year][0]:
+            selected[year] = (key, path)
+    return sorted(item[1] for item in selected.values())
 
 
 @dataclass
@@ -87,8 +111,18 @@ class NSIDCReader:
                 f"Searched bases: {searched}. Expected names resembling "
                 "NSIDC_SH_totalSIA_daily_*.nc."
             )
-        base, _ = match
-        ds = ensure_time_dim(open_product("nsidc_total_daily_sh", base=base, chunks=self.config.chunks, strict=True))
+        _, files = match
+        files = prefer_latest_daily_versions(files)
+        ds = xr.open_mfdataset(
+            [str(path) for path in files],
+            chunks=self.config.chunks,
+            combine="by_coords",
+            data_vars="minimal",
+            coords="minimal",
+            compat="override",
+            decode_timedelta=False,
+        )
+        ds = ensure_time_dim(ds)
         variables: dict[str, xr.DataArray] = {}
         for target, candidates in {
             "SIA": ("SIA", "SIA_cdr", "sia"),

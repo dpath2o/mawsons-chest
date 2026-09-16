@@ -6,6 +6,7 @@ import glob
 import re
 import xarray as xr
 from floes.config import FloesConfig
+from floes.observations.sea_ice import ensure_time_dim
 
 Source = Literal["ACCESS-OM2", "ACCESS-OM3", "EN4", "ORAS5", "IAP"]
 
@@ -46,13 +47,13 @@ class OceanReader:
                         break
                 return da.to_dataset(name=var)
             ds = xr.open_mfdataset(files, preprocess=preprocess, chunks=chunks, parallel=parallel, decode_timedelta=False, combine="by_coords", join="outer")
-            return ds[var]
+            return ensure_time_dim(ds[var])
         dims = self._infer_var_dims(files[0], var=var)
         preprocess = self._preprocess_generic(var=var, dims=dims, latmin=latmin, latmax=latmax, zmin=zmin, zmax=zmax)
         ds = xr.open_mfdataset(files, preprocess=preprocess, chunks=chunks, parallel=parallel, decode_timedelta=False, combine="by_coords", join="outer")
         if var not in ds:
             raise KeyError(f"Variable {var!r} not found after opening files.")
-        return ds[var]
+        return ensure_time_dim(ds[var])
 
     def _get_filepaths(self, *, src: Source, expt: str, var: str, years: list[str], freq: str) -> list[str]:
         if src in {"ACCESS-OM2", "ACCESS-OM3"}:

@@ -61,6 +61,12 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("/g/data/gv90/wrh581"),
         help="Base directory containing known observational resources.",
     )
+    p.add_argument(
+        "--era5-root",
+        type=Path,
+        default=Path("/g/data/rt52"),
+        help="Root containing the official era5/ and near-real-time era5t/ collections.",
+    )
     p.add_argument("--fig-dir", type=Path, default=None, help="Figure output directory.")
     p.add_argument("--docs-dir", type=Path, default=None, help="Documentation/gallery output directory.")
     p.add_argument("--year", type=int, default=default_year)
@@ -92,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         project=args.project,
         user=args.user,
         gadi_base=args.gadi_base,
+        era5_root=args.era5_root,
         output_root=args.fig_dir,
         docs_root=args.docs_dir,
         climatology_start=args.clim_start,
@@ -104,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         "requested_year": args.year,
         "requested_month": args.month,
         "gadi_base": str(cfg.gadi_base),
+        "era5_root": str(cfg.era5_root),
         "nsidc_daily_base": str(args.nsidc_daily_base),
         "figure_root": str(cfg.figure_root),
         "gallery": str(cfg.markdown_gallery),
@@ -116,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         "Note           : if that month is unavailable, map products fall back to latest available <= requested month."
     )
     print(f"Gadi base      : {cfg.gadi_base}")
+    print(f"ERA5 root      : {cfg.era5_root}")
     print(f"NSIDC daily    : {args.nsidc_daily_base}")
     print(f"Figure dir     : {cfg.figure_root}")
     print(f"Gallery        : {cfg.markdown_gallery}")
@@ -266,10 +275,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         out = cfg.figure_root / f"ERA5_wind_SIE_SH_{y:04d}{m:02d}.png"
         suffix = "" if exact else f" (latest available; requested {args.year:04d}-{args.month:02d})"
+        source = da.attrs.get("source", "ERA5")
         return plotter.plot_gridded_anomaly(
             da,
             output=out,
-            title=f"ERA5 wind speed, {y:04d}-{m:02d}{suffix}",
+            title=f"{source} wind speed, {y:04d}-{m:02d}{suffix}",
             cpt="turbo",
             limit=20.0,
             units_label="m s-1",
@@ -279,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
         reader = OceanReader(cfg)
         da = reader.read(
             src="ORAS5",
-            var="thetao",
+            var="votemper",
             start_year=max(args.year - 5, 1979),
             end_year=args.year,
             latmin=-80,
@@ -294,7 +304,30 @@ def main(argv: list[str] | None = None) -> int:
             exclude.add(zdim)
         spatial_dims = [d for d in da.dims if d not in exclude]
         hov = da.mean(dim=spatial_dims, skipna=True) if spatial_dims else da
-        nc = cfg.figure_root / "ORAS5_thetao_depth_time_SH_latest.nc"
+        nc = cfg.figure_root / "ORAS5_votemper_depth_time_SH_latest.nc"
+        hov.to_netcdf(nc)
+        return nc
+
+    def en4_hovmoller_scaffold():
+        reader = OceanReader(cfg)
+        da = reader.read(
+            src="EN4",
+            var="temperature",
+            start_year=max(args.year - 5, 1979),
+            end_year=args.year,
+            latmin=-80,
+            latmax=-45,
+            zmin=0,
+            zmax=1000,
+            allow_latest=True,
+        )
+        zdim = next((d for d in ("depth", "deptht", "depth_std", "lev") if d in da.dims), None)
+        exclude = {"time"}
+        if zdim:
+            exclude.add(zdim)
+        spatial_dims = [d for d in da.dims if d not in exclude]
+        hov = da.mean(dim=spatial_dims, skipna=True) if spatial_dims else da
+        nc = cfg.figure_root / "EN4_temperature_depth_time_SH_latest.nc"
         hov.to_netcdf(nc)
         return nc
 
@@ -302,6 +335,9 @@ def main(argv: list[str] | None = None) -> int:
     _run_step("ERA5 wind map", era5_wind_map, keep_going=True, manifest=manifest, verbose=args.verbose)
     _run_step(
         "ORAS5 depth-time diagnostic", oras_hovmoller_scaffold, keep_going=True, manifest=manifest, verbose=args.verbose
+    )
+    _run_step(
+        "EN4 depth-time diagnostic", en4_hovmoller_scaffold, keep_going=True, manifest=manifest, verbose=args.verbose
     )
 
     gallery = write_gallery(fig_dir=cfg.figure_root, md_path=cfg.markdown_gallery)

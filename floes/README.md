@@ -50,17 +50,18 @@ The monthly runner prepares the following products when the required data are pr
 1. `NSIDC_SH_sic_anomaly_YYYYMM.png` -- Southern Hemisphere SIC anomaly map with climatological and current 15 percent ice-edge overlays.
 2. `NSIDC_SH_total_SIA_SIE_monthly.png` -- total sea-ice area and extent monthly time series.
 3. `OISST_global_sst_anomaly_YYYYMM.png` -- optional OISST anomaly map.
-4. `ERA5_wind_SIE_SH_YYYYMM.png` -- optional Southern Ocean wind and ice-edge map.
-5. `ORAS5_thetao_depth_time_SH_YYYYMM.png` -- optional ocean Hovmoller/section-style diagnostic scaffold.
+4. `ERA5_wind_SIE_SH_YYYYMM.png` -- optional Southern Ocean wind map, using final ERA5 where available and ERA5T for the publication-lag window.
+5. `ORAS5_votemper_depth_time_SH_latest.nc` -- current, dynamically complete monthly ocean diagnostic scaffold.
+6. `EN4_temperature_depth_time_SH_latest.nc` -- observationally constrained monthly ocean comparison through the latest local EN4 month.
 
 It also reproduces the core NSIDC diagnostics from Will Hobbs' `Obs-seaice-analysis` workflow:
 
-6. `NSIDC_SIA_cdr_monthly_tplot_absolute.png` -- monthly SH SIA anomalies, with positive/negative fill.
-7. `NSIDC_SIA_cdr_monthly_tplot_standardised.png` -- the same series normalised by calendar-month standard deviation.
-8. `NSIDC_Arctic_vs_Antarctic_annual.png` -- annual global SIE and Arctic-versus-Antarctic comparison.
-9. `NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png` -- monthly global and paired hemispheric SIE anomalies.
-10. `NSIDC_SIE_cdr_monthly_anoms_byyear.png` -- all SH monthly SIE anomaly cycles with the requested year highlighted.
-11. `NSIDC_SIEmax_vs_day-of-max.png` -- five-day-smoothed annual SH maximum SIE versus day of maximum.
+7. `NSIDC_SIA_cdr_monthly_tplot_absolute.png` -- monthly SH SIA anomalies, with positive/negative fill.
+8. `NSIDC_SIA_cdr_monthly_tplot_standardised.png` -- the same series normalised by calendar-month standard deviation.
+9. `NSIDC_Arctic_vs_Antarctic_annual.png` -- annual global SIE and Arctic-versus-Antarctic comparison.
+10. `NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png` -- monthly global and paired hemispheric SIE anomalies.
+11. `NSIDC_SIE_cdr_monthly_anoms_byyear.png` -- all SH monthly SIE anomaly cycles with the requested year highlighted.
+12. `NSIDC_SIEmax_vs_day-of-max.png` -- five-day-smoothed annual SH maximum SIE versus day of maximum.
 
 The Will-equivalent diagnostic defaults preserve the original `1979–2018` climatology and `2005` split year. They can be changed independently of the SIC-map climatology:
 
@@ -79,9 +80,11 @@ Use `--skip-will-suite` when only the original map and ancillary products are wa
 The daily reader first checks `--nsidc-daily-base`, then falls back to
 `--gadi-base`. It recognises the original `NSIDC/SIE_daily/` layout and
 recursively searches for similarly named pre-integrated daily SH SIA/SIE files.
-The ERA5 wind reader is deliberately restricted to
-`ERA5_sfcwind_monthly_SH_*.nc`-style files so that unrelated ERA5 products on
-different latitude grids are not merged.
+Where two NSIDC versions exist for one year, only the highest version/revision
+is opened. ERA5 surface fields are read directly from `/g/data/rt52`: final
+`era5/` is preferred for any complete requested month and near-real-time
+`era5t/` fills the current publication lag. Historical climatologies must use
+final ERA5 only.
 
 Optional figures are skipped if the local product cannot be found. This is intentional for a first layer: the weekly/monthly operator should get all available figures rather than a failed PBS job because one ancillary product is absent.
 
@@ -91,6 +94,8 @@ Default Gadi resources are centralised in `floes/config.py` and `floes/io/regist
 
 ```text
 /g/data/gv90/wrh581
+/g/data/rt52/era5
+/g/data/rt52/era5t
 ```
 
 An override project/user/output directories from the PBS command or the Python script:
@@ -107,7 +112,8 @@ For a different Gadi data root:
 
 ```bash
 python scripts/update_mthly_sea_ice_sci_chat_figs.py \
-  --gadi-base /g/data/gv90/wrh581
+  --gadi-base /g/data/gv90/wrh581 \
+  --era5-root /g/data/rt52
 ```
 
 ## Downloading missing data

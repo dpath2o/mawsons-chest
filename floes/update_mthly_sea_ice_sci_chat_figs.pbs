@@ -4,7 +4,7 @@
 #PBS -l walltime=02:00:00
 #PBS -l ncpus=8
 #PBS -l mem=64GB
-#PBS -l storage=gdata/gv90+scratch/gv90+gdata/jk72+gdata/xp65
+#PBS -l storage=gdata/gv90+scratch/gv90+gdata/jk72+gdata/xp65+gdata/rt52
 #PBS -j oe
 #PBS -N floes_mthly_sic
 
@@ -16,7 +16,7 @@
 #   qsub -P <project> ./update_mthly_sea_ice_sci_chat_figs.pbs
 #
 # To override runtime options:
-#   qsub -v FLOES_YEAR=2026,FLOES_MONTH=8,FLOES_GADI_BASE=/g/data/gv90/wrh581,FLOES_NSIDC_DAILY_BASE=/g/data/jk72/wrh581 ./update_mthly_sea_ice_sci_chat_figs.pbs
+#   qsub -v FLOES_YEAR=2026,FLOES_MONTH=8,FLOES_GADI_BASE=/g/data/gv90/wrh581,FLOES_NSIDC_DAILY_BASE=/g/data/jk72/wrh581,FLOES_ERA5_ROOT=/g/data/rt52 ./update_mthly_sea_ice_sci_chat_figs.pbs
 
 set -euo pipefail
 
@@ -29,11 +29,12 @@ cd "${PBS_O_WORKDIR:-$PWD}"
 PROJECT="${PROJECT:-${PBS_PROJECT:-gv90}}"
 GADI_USER="${GADI_USER:-${USER}}"
 FLOES_GADI_BASE="${FLOES_GADI_BASE:-/g/data/gv90/wrh581}"
+FLOES_ERA5_ROOT="${FLOES_ERA5_ROOT:-/g/data/rt52}"
 
 export OMP_NUM_THREADS=1
 export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
 
-ARGS=(--project "$PROJECT" --user "$GADI_USER" --gadi-base "$FLOES_GADI_BASE")
+ARGS=(--project "$PROJECT" --user "$GADI_USER" --gadi-base "$FLOES_GADI_BASE" --era5-root "$FLOES_ERA5_ROOT")
 
 if [[ -n "${FLOES_YEAR:-}" ]]; then
     ARGS+=(--year "$FLOES_YEAR")

@@ -30,6 +30,7 @@ class FloesConfig:
     project: str = "gv90"
     user: str = os.environ.get("USER", "unknown")
     gadi_base: Path = Path("/g/data/gv90/wrh581")
+    era5_root: Path = Path("/g/data/rt52")
     local_cache: Path | None = None
     output_root: Path | None = None
     docs_root: Path | None = None
