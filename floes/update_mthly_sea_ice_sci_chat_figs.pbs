@@ -16,7 +16,7 @@
 #   qsub -P <project> ./update_mthly_sea_ice_sci_chat_figs.pbs
 #
 # To override runtime options:
-#   qsub -v FLOES_YEAR=2026,FLOES_MONTH=5,FLOES_GADI_BASE=/g/data/gv90/wrh581 ./update_mthly_sea_ice_sci_chat_figs.pbs
+#   qsub -v FLOES_YEAR=2026,FLOES_MONTH=8,FLOES_GADI_BASE=/g/data/gv90/wrh581,FLOES_NSIDC_DAILY_BASE=/g/data/jk72/wrh581 ./update_mthly_sea_ice_sci_chat_figs.pbs
 
 set -euo pipefail
 
@@ -40,6 +40,12 @@ if [[ -n "${FLOES_YEAR:-}" ]]; then
 fi
 if [[ -n "${FLOES_MONTH:-}" ]]; then
     ARGS+=(--month "$FLOES_MONTH")
+fi
+if [[ -n "${FLOES_NSIDC_DAILY_BASE:-}" ]]; then
+    ARGS+=(--nsidc-daily-base "$FLOES_NSIDC_DAILY_BASE")
+fi
+if [[ "${FLOES_SKIP_WILL_SUITE:-0}" == "1" ]]; then
+    ARGS+=(--skip-will-suite)
 fi
 if [[ "${FLOES_STRICT:-0}" == "1" ]]; then
     ARGS+=(--strict)

@@ -45,13 +45,36 @@ The initial implementation consolidates these legacy/precursor workflows:
 
 ## Current figure families
 
-The first-pass monthly runner prepares the following products when the required data are present:
+The monthly runner prepares the following products when the required data are present:
 
 1. `NSIDC_SH_sic_anomaly_YYYYMM.png` -- Southern Hemisphere SIC anomaly map with climatological and current 15 percent ice-edge overlays.
 2. `NSIDC_SH_total_SIA_SIE_monthly.png` -- total sea-ice area and extent monthly time series.
 3. `OISST_global_sst_anomaly_YYYYMM.png` -- optional OISST anomaly map.
 4. `ERA5_wind_SIE_SH_YYYYMM.png` -- optional Southern Ocean wind and ice-edge map.
 5. `ORAS5_thetao_depth_time_SH_YYYYMM.png` -- optional ocean Hovmoller/section-style diagnostic scaffold.
+
+It also reproduces the core NSIDC diagnostics from Will Hobbs' `Obs-seaice-analysis` workflow:
+
+6. `NSIDC_SIA_cdr_monthly_tplot_absolute.png` -- monthly SH SIA anomalies, with positive/negative fill.
+7. `NSIDC_SIA_cdr_monthly_tplot_standardised.png` -- the same series normalised by calendar-month standard deviation.
+8. `NSIDC_Arctic_vs_Antarctic_annual.png` -- annual global SIE and Arctic-versus-Antarctic comparison.
+9. `NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png` -- monthly global and paired hemispheric SIE anomalies.
+10. `NSIDC_SIE_cdr_monthly_anoms_byyear.png` -- all SH monthly SIE anomaly cycles with the requested year highlighted.
+11. `NSIDC_SIEmax_vs_day-of-max.png` -- five-day-smoothed annual SH maximum SIE versus day of maximum.
+
+The Will-equivalent diagnostic defaults preserve the original `1979–2018` climatology and `2005` split year. They can be changed independently of the SIC-map climatology:
+
+```bash
+python scripts/update_mthly_sea_ice_sci_chat_figs.py \
+  --year 2026 \
+  --month 8 \
+  --will-clim-start 1979 \
+  --will-clim-end 2018 \
+  --comparison-split-year 2005 \
+  --nsidc-daily-base /g/data/jk72/wrh581
+```
+
+Use `--skip-will-suite` when only the original map and ancillary products are wanted.
 
 Optional figures are skipped if the local product cannot be found. This is intentional for a first layer: the weekly/monthly operator should get all available figures rather than a failed PBS job because one ancillary product is absent.
 
@@ -117,9 +140,10 @@ Otherwise:
 - pandas
 - netCDF4 or h5netcdf
 - dask, optional but recommended
-- PyGMTv0.15 + GMTv6+
+- PyGMTv0.15 + GMTv6+ for map products
+- matplotlib for the legacy NSIDC time-series and scatter diagnostics
 
->Note: No NCL, matplotlib, or cartopy code paths are used in the monthly plotting backbone.
+>Note: NCL and cartopy are not required. PyGMT remains the map backend; matplotlib is used for the legacy time-series and scatter diagnostics.
 
 ## Integration into mawsons-chest
 

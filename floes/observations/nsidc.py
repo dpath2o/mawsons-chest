@@ -1,17 +1,41 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
+
 import xarray as xr
+
 from floes.config import FloesConfig
 from floes.io.gadi import find_product_files, open_product
-from .sea_ice import compute_sia_sie, monthly_climatology, resolve_year_month, select_year_month, standardise_sic
+
+from .sea_ice import (
+    compute_sia_sie,
+    ensure_time_dim,
+    mask_months,
+    monthly_climatology,
+    resolve_year_month,
+    select_year_month,
+    standardise_sic,
+)
+
 
 @dataclass
 class NSIDCReader:
     """Reader/processor for NSIDC CDR sea-ice concentration products."""
+
     config: FloesConfig
-    product_key: str = "nsidc_cdr_sic_monthly_sh"
-    area_key: str = "nsidc_cell_area_sh"
+    hemisphere: str = "SH"
+    product_key: str | None = None
+    area_key: str | None = None
+    daily_base: Path | None = None
+
+    def __post_init__(self) -> None:
+        self.hemisphere = self.hemisphere.upper()
+        if self.hemisphere not in {"SH", "NH"}:
+            raise ValueError("hemisphere must be 'SH' or 'NH'")
+        suffix = self.hemisphere.lower()
+        self.product_key = self.product_key or f"nsidc_cdr_sic_monthly_{suffix}"
+        self.area_key = self.area_key or f"nsidc_cell_area_{suffix}"
 
     def available_files(self) -> list[Path]:
         return find_product_files(self.product_key, base=self.config.gadi_base, strict=False)
@@ -41,7 +65,30 @@ class NSIDCReader:
         raise KeyError(f"No recognised SIC variable in NSIDC dataset: {list(ds.data_vars)}")
 
     def total_sia_sie(self) -> xr.Dataset:
-        return compute_sia_sie(self.sic(), self.open_area(), threshold=self.config.sic_threshold)
+        out = compute_sia_sie(self.sic(), self.open_area(), threshold=self.config.sic_threshold)
+        out = mask_months(out)
+        out.attrs.update({"source": "NSIDC CDR", "hemisphere": self.hemisphere})
+        return out
+
+    def daily_total_sia_sie(self) -> xr.Dataset:
+        """Open the pre-integrated daily SH SIA/SIE files used by the legacy workflow."""
+        if self.hemisphere != "SH":
+            raise NotImplementedError("Only the Southern Hemisphere daily total product is registered.")
+        base = self.daily_base or self.config.gadi_base
+        ds = ensure_time_dim(open_product("nsidc_total_daily_sh", base=base, chunks=self.config.chunks, strict=True))
+        variables: dict[str, xr.DataArray] = {}
+        for target, candidates in {
+            "SIA": ("SIA", "SIA_cdr", "sia"),
+            "SIE": ("SIE", "SIE_cdr", "sie"),
+        }.items():
+            name = next((candidate for candidate in candidates if candidate in ds), None)
+            if name is not None:
+                variables[target] = ds[name]
+        if "SIE" not in variables:
+            raise KeyError(f"No recognised daily SIE variable in NSIDC dataset: {list(ds.data_vars)}")
+        out = xr.Dataset(variables)
+        out.attrs.update({"source": "NSIDC CDR", "hemisphere": self.hemisphere, "temporal_resolution": "daily"})
+        return out
 
     def sic_month_and_climatology(self, *, year: int, month: int, fallback_latest: bool = True) -> xr.Dataset:
         sic = self.sic()
@@ -49,18 +96,20 @@ class NSIDCReader:
         exact = True
         if fallback_latest:
             year, month, exact = resolve_year_month(sic, requested_year, requested_month)
-        clim = monthly_climatology(sic, start_year = self.config.climatology_start, end_year = self.config.climatology_end)
+        clim = monthly_climatology(sic, start_year=self.config.climatology_start, end_year=self.config.climatology_end)
         month_field = select_year_month(sic, year, month)
         clim_field = clim.sel(month=month)
         anom = month_field - clim_field
         anom.name = "sic_anom"
-        common_attrs = {"requested_year": requested_year,
-                        "requested_month": requested_month,
-                        "selected_year": int(year),
-                        "selected_month": int(month),
-                        "exact_requested_month": bool(exact),
-                        "climatology_start": self.config.climatology_start,
-                        "climatology_end": self.config.climatology_end}
+        common_attrs = {
+            "requested_year": requested_year,
+            "requested_month": requested_month,
+            "selected_year": int(year),
+            "selected_month": int(month),
+            "exact_requested_month": bool(exact),
+            "climatology_start": self.config.climatology_start,
+            "climatology_end": self.config.climatology_end,
+        }
         anom.attrs.update({"long_name": "sea ice concentration anomaly", "units": "1", **common_attrs})
         month_field.attrs.update(common_attrs)
         clim_field.attrs.update(common_attrs)
