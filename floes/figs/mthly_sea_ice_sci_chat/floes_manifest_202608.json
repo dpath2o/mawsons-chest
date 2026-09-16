@@ -1,0 +1,55 @@
+{
+  "requested_year": 2026,
+  "requested_month": 8,
+  "gadi_base": "/g/data/gv90/wrh581",
+  "era5_root": "/g/data/rt52",
+  "nsidc_daily_base": "/g/data/jk72/wrh581",
+  "figure_root": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat",
+  "gallery": "/g/data/gv90/da1339/src/mawsons-chest/floes/docs/mthly_sea_ice_sci_chat_figs.md",
+  "steps": {
+    "NSIDC SIC anomaly map": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202607.png"
+    },
+    "NSIDC total SIA/SIE time series": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_total_SIA_SIE_monthly.png"
+    },
+    "Will: SH monthly SIA anomaly": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_absolute.png"
+    },
+    "Will: SH standardised monthly SIA anomaly": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_standardised.png"
+    },
+    "Will: Arctic-Antarctic SIE comparison": {
+      "status": "ok",
+      "result": "(PosixPath('/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_annual.png'), PosixPath('/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png'))"
+    },
+    "Will: SH monthly SIE anomalies by year": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIE_cdr_monthly_anoms_byyear.png"
+    },
+    "Will: SH SIE maximum versus date": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIEmax_vs_day-of-max.png"
+    },
+    "OISST SST anomaly map": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/OISST_global_sst_anomaly_202607.png"
+    },
+    "ERA5 wind map": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202608.png"
+    },
+    "ORAS5 depth-time diagnostic": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ORAS5_votemper_depth_time_SH_latest.nc"
+    },
+    "EN4 depth-time diagnostic": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/EN4_temperature_depth_time_SH_latest.nc"
+    }
+  }
+}
