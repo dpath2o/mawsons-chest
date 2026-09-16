@@ -74,7 +74,20 @@ class NSIDCReader:
         """Open the pre-integrated daily SH SIA/SIE files used by the legacy workflow."""
         if self.hemisphere != "SH":
             raise NotImplementedError("Only the Southern Hemisphere daily total product is registered.")
-        base = self.daily_base or self.config.gadi_base
+        bases = []
+        for base in (self.daily_base, self.config.gadi_base):
+            if base is not None and Path(base) not in bases:
+                bases.append(Path(base))
+        files_by_base = [(base, find_product_files("nsidc_total_daily_sh", base=base, strict=False)) for base in bases]
+        match = next(((base, files) for base, files in files_by_base if files), None)
+        if match is None:
+            searched = ", ".join(str(base) for base in bases)
+            raise FileNotFoundError(
+                "No pre-integrated NSIDC daily SH SIA/SIE files were found. "
+                f"Searched bases: {searched}. Expected names resembling "
+                "NSIDC_SH_totalSIA_daily_*.nc."
+            )
+        base, _ = match
         ds = ensure_time_dim(open_product("nsidc_total_daily_sh", base=base, chunks=self.config.chunks, strict=True))
         variables: dict[str, xr.DataArray] = {}
         for target, candidates in {

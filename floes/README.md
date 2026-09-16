@@ -76,6 +76,13 @@ python scripts/update_mthly_sea_ice_sci_chat_figs.py \
 
 Use `--skip-will-suite` when only the original map and ancillary products are wanted.
 
+The daily reader first checks `--nsidc-daily-base`, then falls back to
+`--gadi-base`. It recognises the original `NSIDC/SIE_daily/` layout and
+recursively searches for similarly named pre-integrated daily SH SIA/SIE files.
+The ERA5 wind reader is deliberately restricted to
+`ERA5_sfcwind_monthly_SH_*.nc`-style files so that unrelated ERA5 products on
+different latitude grids are not merged.
+
 Optional figures are skipped if the local product cannot be found. This is intentional for a first layer: the weekly/monthly operator should get all available figures rather than a failed PBS job because one ancillary product is absent.
 
 ## Gadi assumptions

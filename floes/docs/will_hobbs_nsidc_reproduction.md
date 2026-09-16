@@ -26,6 +26,11 @@ Monthly NH and SH SIC plus grid-cell areas are discovered below `--gadi-base` (d
 NSIDC/SIE_daily/NSIDC_SH_totalSIA_daily_*.nc
 ```
 
+If that location is empty, the reader also searches beneath `--gadi-base`,
+including nested directories with similarly named pre-integrated SH daily
+SIA/SIE files. It does not silently substitute monthly data for the daily
+maximum calculation.
+
 December 1987 and January 1988 are retained on the time axis but masked, matching the legacy workflow's treatment of the known zero-filled gap.
 
 If the latest daily record ends before 31 October, the current year's maximum is explicitly labelled provisional in the figure.
