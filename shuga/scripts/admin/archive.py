@@ -22,6 +22,10 @@ Primary tasks
 
 2. Use MAPPED_CASES to determine the corresponding archive experiment.
 
+   With --create-mapped-dirs, missing mapped archive experiment directories are
+   permitted. In dry-run mode they are reported as "would create"; with
+   --send-to-archive they are created before any files are staged.
+
 3. Compare archive zarr monthly groups:
        <archive-root>/<EXPERIMENT_NAME>/zarr/iceh_daily.zarr/YYYY_MM
 
@@ -60,6 +64,12 @@ Examples
 Dry-run:
     afim_archive_admin.py --verbose
 
+Dry-run, allowing/reporting creation of missing mapped experiment directories:
+    afim_archive_admin.py --create-mapped-dirs --verbose
+
+Actually create missing mapped experiment directories and archive files:
+    afim_archive_admin.py --send-to-archive --create-mapped-dirs --verbose
+
 Actually copy history files, metadata, and latest restart:
     afim_archive_admin.py --send-to-archive --verbose
 
@@ -87,8 +97,11 @@ DEFAULT_ARCHIVE_ROOT = "/g/data/gv90/da1339/afim_output"
 #
 # This dictionary is authoritative. Any run directory not listed here is skipped.
 #
-MAPPED_CASES = {"free-slip"   : "Cs-high-hmix20",
-                "frcg-exp02"  : "Cs-high-snow-half"}
+MAPPED_CASES = {"frcg-exp01": "waves-floe100",
+                "frcg-exp02": "waves-tides-floe100",
+                "frcg-exp03": "waves-floe300",
+                "frcg-exp04": "waves-tides-floe300",
+                "frcg-exp05": "tides-only"}
 
 D_AVOIDS     = {"CICE_0p25_Cgrid_coords.zarr", "future_work", "paper1", "paper3"}
 DATE_RE      = re.compile(r"(?P<year>[12][0-9]{3})[-_](?P<month>[01][0-9])[-_](?P<day>[0-3][0-9])")
@@ -142,21 +155,81 @@ def list_archive_experiments(archive_root):
             experiments.append(path)
     return sorted(experiments, key=lambda p: natural_key(p.name))
 
-def validate_mapped_cases(run_dirs, archive_names):
+def validate_mapped_cases(
+    run_dirs,
+    archive_root,
+    create_mapped_dirs=False,
+    dry_run=True,
+):
     """
     Validate MAPPED_CASES against available run and archive directories.
+
+    Missing mapped archive experiment directories are fatal by default.
+
+    With --create-mapped-dirs:
+      * dry-run: report directories that would be created;
+      * send mode: create them before processing begins.
     """
     if not MAPPED_CASES:
         print("ERROR: MAPPED_CASES is empty. Populate it before running.", file=sys.stderr)
         sys.exit(2)
+
     run_names = {path.name for path in run_dirs}
     errors = 0
-    for run_case, exp_name in sorted(MAPPED_CASES.items(), key=lambda item: natural_key(item[0])):
+    handled_missing = set()
+
+    for run_case, exp_name in sorted(
+        MAPPED_CASES.items(),
+        key=lambda item: natural_key(item[0]),
+    ):
         if run_case not in run_names:
-            print(f"WARNING: MAPPED_CASES contains run case not present under runs root: {run_case}", file = sys.stderr)
-        if exp_name not in archive_names:
-            print(f"ERROR: MAPPED_CASES maps {run_case} -> {exp_name}, but archive directory does not exist.", file = sys.stderr)
+            print(
+                f"WARNING: MAPPED_CASES contains run case not present under runs root: {run_case}",
+                file=sys.stderr,
+            )
+
+        exp_dir = archive_root / exp_name
+
+        if exp_dir.is_dir():
+            continue
+
+        if exp_dir.exists():
+            print(
+                f"ERROR: mapped archive path exists but is not a directory: "
+                f"{run_case} -> {exp_dir}",
+                file=sys.stderr,
+            )
             errors += 1
+            continue
+
+        if not create_mapped_dirs:
+            print(
+                f"ERROR: MAPPED_CASES maps {run_case} -> {exp_name}, "
+                f"but archive directory does not exist.",
+                file=sys.stderr,
+            )
+            errors += 1
+            continue
+
+        # Avoid duplicate messages/work if multiple run cases map to one experiment.
+        if exp_dir in handled_missing:
+            continue
+        handled_missing.add(exp_dir)
+
+        if dry_run:
+            print(f"WOULD CREATE archive experiment directory: {exp_dir}")
+        else:
+            try:
+                exp_dir.mkdir(parents=True, exist_ok=True)
+                print(f"CREATED archive experiment directory: {exp_dir}")
+            except OSError as err:
+                print(
+                    f"ERROR: failed to create archive experiment directory "
+                    f"{exp_dir}: {err}",
+                    file=sys.stderr,
+                )
+                errors += 1
+
     if errors:
         sys.exit(2)
 
@@ -703,6 +776,16 @@ def main():
     )
 
     parser.add_argument(
+        "--create-mapped-dirs",
+        action="store_true",
+        help=(
+            "Allow missing MAPPED_CASES archive experiment directories. "
+            "In dry-run mode, report directories that would be created; "
+            "with --send-to-archive, create them before archiving."
+        ),
+    )
+
+    parser.add_argument(
         "--move-history-files",
         action="store_true",
         help="Move unprocessed ice history files instead of copying them. Requires --send-to-archive to actually move.",
@@ -740,12 +823,20 @@ def main():
 
     dry_run = not args.send_to_archive
 
-    archive_dirs = list_archive_experiments(archive_root)
-    archive_names = {path.name for path in archive_dirs}
+    # The archive root itself must already exist. Missing experiment directories
+    # beneath it can optionally be created with --create-mapped-dirs.
+    if not archive_root.is_dir():
+        print(f"ERROR: archive root does not exist: {archive_root}", file=sys.stderr)
+        sys.exit(1)
 
     run_dirs = list_run_dirs(runs_root)
 
-    validate_mapped_cases(run_dirs, archive_names)
+    validate_mapped_cases(
+        run_dirs,
+        archive_root,
+        create_mapped_dirs=args.create_mapped_dirs,
+        dry_run=dry_run,
+    )
 
     if dry_run:
         print("Mode: DRY-RUN. No files will be copied, moved, or deleted.")
@@ -762,6 +853,14 @@ def main():
         print("Clean CICE run dirs: ENABLED.")
     else:
         print("Clean CICE run dirs: disabled.")
+
+    if args.create_mapped_dirs:
+        if dry_run:
+            print("Create mapped dirs: ENABLED (dry-run: report only).")
+        else:
+            print("Create mapped dirs: ENABLED.")
+    else:
+        print("Create mapped dirs: disabled.")
 
     print(f"Runs root   : {runs_root}")
     print(f"Archive root: {archive_root}")
@@ -790,12 +889,16 @@ def main():
         exp_dir = archive_root / exp_name
 
         if not exp_dir.is_dir():
-            print(
-                f"ERROR: mapped archive directory does not exist: "
-                f"{run_case} -> {exp_dir}",
-                file=sys.stderr,
-            )
-            continue
+            # In dry-run + --create-mapped-dirs, validation has already reported
+            # that this directory would be created. Continue so the complete
+            # archive plan can still be inspected.
+            if not (dry_run and args.create_mapped_dirs and not exp_dir.exists()):
+                print(
+                    f"ERROR: mapped archive directory does not exist: "
+                    f"{run_case} -> {exp_dir}",
+                    file=sys.stderr,
+                )
+                continue
 
         if args.verbose:
             print(f"{run_case} -> {exp_name}")
