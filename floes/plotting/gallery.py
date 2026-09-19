@@ -10,6 +10,7 @@ from typing import Sequence
 class GalleryFigure:
     path: Path
     heading: str
+    extra_markdown: str | None = None
     description: str | None = None
     caption: str | None = None
 
@@ -65,6 +66,8 @@ def write_gallery(
             lines.extend([f"![{figure.heading}]({rel.as_posix()})", ""])
             if figure.caption:
                 lines.extend([f"*{figure.caption}*", ""])
+            if figure.extra_markdown:
+                lines.extend([figure.extra_markdown, ""])
 
     md_path.write_text("\n".join(lines), encoding="utf-8")
     return md_path

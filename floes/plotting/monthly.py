@@ -107,7 +107,7 @@ class MonthlySeaIceChatPlotter:
             if name not in ds:
                 continue
             plot_geographic_contour(fig, ds[name], level=self.config.sic_threshold, pen=pen)
-        fig.colorbar(frame=["x+lSIC anomaly", "y+lfraction"])
+        fig.colorbar(cmap=str(cpt_path), frame=["x+lSIC anomaly", "y+lfraction"])
         fig.savefig(str(output), dpi=200)
         return output
 
@@ -204,6 +204,6 @@ class MonthlySeaIceChatPlotter:
         frame = [f"x+l{x_label}"]
         if colorbar_unit:
             frame.append(f"y+l{colorbar_unit}")
-        fig.colorbar(frame=frame)
+        fig.colorbar(cmap=str(cpt_path), frame=frame)
         fig.savefig(str(output), dpi=200)
         return output

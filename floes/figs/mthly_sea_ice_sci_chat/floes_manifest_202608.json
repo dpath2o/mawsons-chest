@@ -28,9 +28,21 @@
       "status": "ok",
       "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202404.png"
     },
-    "Will: SH monthly SIA anomaly": {
+    "NSIDC rolling map archive": {
       "status": "ok",
-      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_absolute.png"
+      "result": "9"
+    },
+    "Bremen rolling map archive": {
+      "status": "ok",
+      "result": "3"
+    },
+    "ESA CCI rolling map archive": {
+      "status": "ok",
+      "result": "9"
+    },
+    "Will: SH daily SIA anomalies": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_SIA_daily_anomalies_last20yr.png"
     },
     "Will: SH standardised monthly SIA anomaly": {
       "status": "ok",
@@ -40,9 +52,9 @@
       "status": "ok",
       "result": "(PosixPath('/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_annual.png'), PosixPath('/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png'))"
     },
-    "Will: SH monthly SIE anomalies by year": {
+    "Will: SH daily SIE anomalies by year": {
       "status": "ok",
-      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIE_cdr_monthly_anoms_byyear.png"
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_SIE_daily_anomalies_last20yr.png"
     },
     "Will: SH SIE maximum versus date": {
       "status": "ok",
@@ -55,6 +67,10 @@
     "ERA5 wind map": {
       "status": "ok",
       "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202608.png"
+    },
+    "ERA5 rolling map archive": {
+      "status": "ok",
+      "result": "9"
     },
     "ORAS5 depth-time diagnostic": {
       "status": "ok",
