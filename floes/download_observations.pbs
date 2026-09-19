@@ -1,0 +1,53 @@
+#!/bin/bash
+#PBS -P jk72
+#PBS -q copyq
+#PBS -l walltime=10:00:00
+#PBS -l ncpus=1
+#PBS -l mem=16GB
+#PBS -l jobfs=1GB
+#PBS -l storage=gdata/gv90+gdata/jk72+gdata/xp65+scratch/gv90
+#PBS -j oe
+#PBS -N floes_download
+
+# Network acquisition stage for floes.
+#
+# Usage:
+#   cd /path/to/mawsons-chest/floes
+#   qsub ./download_observations.pbs
+#
+# The processing/plotting stage is deliberately separate:
+#   qsub ./update_mthly_sea_ice_sci_chat_figs.pbs
+#
+# Optional overrides:
+#   qsub -v FLOES_YEAR=2026,FLOES_MONTH=8 ./download_observations.pbs
+#   qsub -v FLOES_START_YEAR=1979,FLOES_BREMEN_LOOKBACK=4 ./download_observations.pbs
+#   qsub -v FLOES_SEAICE_ROOT=/g/data/gv90/da1339/SeaIce ./download_observations.pbs
+
+set -euo pipefail
+
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3
+
+cd "${PBS_O_WORKDIR:-$PWD}"
+
+FLOES_SEAICE_ROOT="${FLOES_SEAICE_ROOT:-/g/data/gv90/da1339/SeaIce}"
+FLOES_START_YEAR="${FLOES_START_YEAR:-1979}"
+FLOES_BREMEN_LOOKBACK="${FLOES_BREMEN_LOOKBACK:-4}"
+
+export OMP_NUM_THREADS=1
+export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
+
+ARGS=(all
+      --dest-root "$FLOES_SEAICE_ROOT"
+      --start-year "$FLOES_START_YEAR"
+      --bremen-lookback-months "$FLOES_BREMEN_LOOKBACK")
+
+if [[ -n "${FLOES_YEAR:-}" ]]; then
+    ARGS+=(--year "$FLOES_YEAR")
+fi
+if [[ -n "${FLOES_MONTH:-}" ]]; then
+    ARGS+=(--month "$FLOES_MONTH")
+fi
+
+python -u scripts/downloading/download_observations.py "${ARGS[@]}"

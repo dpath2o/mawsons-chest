@@ -1,0 +1,55 @@
+#!/bin/bash
+#PBS -P gv90
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l mem=4GB
+#PBS -l jobfs=1GB
+#PBS -l walltime=10:00:00
+#PBS -l storage=gdata/gv90+massdata/gv90
+#PBS -lother=mdss
+#PBS -j oe
+
+set -euo pipefail
+
+SRCROOT="/g/data/gv90/da1339/afim_output"
+STAGE="/g/data/gv90/da1339/tape_stage"
+ARCHIVE="${STAGE}/paper1_20260906.tar"
+CHECKSUM="${ARCHIVE}.sha256"
+
+REMOTE="da1339/AFIM_backup_20260906/paper1"
+
+mkdir -p "${STAGE}"
+
+echo "=== SOURCE ==="
+du -sh "${SRCROOT}/paper1"
+
+echo
+echo "=== CREATING TAR ==="
+tar -cf "${ARCHIVE}" -C "${SRCROOT}" paper1
+
+echo
+echo "=== TAR CREATED ==="
+ls -lh "${ARCHIVE}"
+
+echo
+echo "=== CHECKSUM ==="
+sha256sum "${ARCHIVE}" | tee "${CHECKSUM}"
+
+echo
+echo "=== CREATE MASSDATA DIRECTORY ==="
+mdss -P gv90 mkdir -p "${REMOTE}"
+
+echo
+echo "=== UPLOAD TAR ==="
+mdss -P gv90 put "${ARCHIVE}" "${REMOTE}/paper1_20260906.tar"
+
+echo
+echo "=== UPLOAD CHECKSUM ==="
+mdss -P gv90 put "${CHECKSUM}" "${REMOTE}/paper1_20260906.tar.sha256"
+
+echo
+echo "=== MASSDATA CONTENTS ==="
+mdss -P gv90 dmls -ltrh "${REMOTE}"
+
+echo
+echo "=== COMPLETE ==="

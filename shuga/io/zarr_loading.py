@@ -84,7 +84,7 @@ def _find_lat_name(ds: xr.Dataset) -> str | None:
             return name
     return None
 
-def _apply_hemisphere_mask(ds: xr.Dataset, hemisphere: str | None) -> xr.Dataset:
+def _apply_hemisphere_mask(ds: xr.Dataset, hemisphere: str | None)-> xr.Dataset:
     if hemisphere is None:
         return ds
     lat_name = _find_lat_name(ds)
@@ -92,8 +92,20 @@ def _apply_hemisphere_mask(ds: xr.Dataset, hemisphere: str | None) -> xr.Dataset
         return ds
     hemi = str(hemisphere).upper()
     lat  = ds[lat_name]
-    mask = lat < 0 if hemi == "SH" else lat > 0
-    return ds.where(mask)
+    if hemi == "SH":
+        mask = lat < 0
+    elif hemi == "NH":
+        mask = lat > 0
+    else:
+        raise ValueError(f"Unsupported hemisphere={hemisphere!r}; expected 'SH' or 'NH'.")
+    spatial_dims = set(lat.dims)
+    out          = ds.copy()
+    for name, da in ds.data_vars.items():
+        # Only spatial/spatiotemporal fields should receive
+        # the 2-D hemisphere mask.
+        if spatial_dims.issubset(set(da.dims)):
+            out[name] = da.where(mask)
+    return out
 
 def _resolve_run_context(run_cfg: RunSpec | None = None, *,
                          sim_name: str | None = None,

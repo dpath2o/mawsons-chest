@@ -17,3 +17,23 @@ def make_symmetric_cpt(pygmt, *, cmap: str, limit: float, output: Path | None = 
     output.parent.mkdir(parents = True, exist_ok = True)
     pygmt.makecpt(cmap = cmap, series = series, output = str(output))
     return str(output)
+
+
+def make_cpt(
+    pygmt,
+    *,
+    cmap: str,
+    minimum: float,
+    maximum: float,
+    output: Path | None = None,
+    series_step: float | None = None,
+) -> str | None:
+    """Create a GMT CPT over an explicit, potentially asymmetric range."""
+    step = series_step or (maximum - minimum) / 10.0
+    series = [minimum, maximum, step]
+    if output is None:
+        pygmt.makecpt(cmap=cmap, series=series)
+        return None
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pygmt.makecpt(cmap=cmap, series=series, output=str(output))
+    return str(output)
