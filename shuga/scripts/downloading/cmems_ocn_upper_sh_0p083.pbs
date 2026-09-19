@@ -1,0 +1,102 @@
+#!/bin/bash
+#PBS -N download-CMEMS-ocn-upper500m-SH-0p083
+#PBS -P gv90
+#PBS -l walltime=10:00:00
+#PBS -q copyq
+#PBS -l mem=16GB
+#PBS -l ncpus=1
+#PBS -l storage=gdata/xp65+gdata/gv90
+#PBS -l wd
+#PBS -m abe
+#PBS -M daniel.atwater@utas.edu.au
+
+set -euo pipefail
+
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3
+
+COPERNICUS="${HOME}/.local/bin/copernicusmarine"
+D_="/g/data/gv90/da1339/afim_input/ORAS/daily/org"
+
+# Global Ocean Physics Reanalysis, 1/12-degree daily mean.
+DATASET_MY="cmems_mod_glo_phy_my_0.083deg_P1D-m"
+DATASET_MYINT="cmems_mod_glo_phy_myint_0.083deg_P1D-m"
+
+YR0=1993
+YRN=$(date +%Y)
+TODAY=$(date +%Y-%m-%d)
+
+mkdir -p "${D_}"
+
+if [[ ! -x "${COPERNICUS}" ]]; then
+    echo "ERROR: Copernicus Marine CLI not found or not executable: ${COPERNICUS}" >&2
+    exit 1
+fi
+
+echo "CMEMS upper-ocean Southern Hemisphere download"
+echo "Destination : ${D_}"
+echo "Years       : ${YR0}-${YRN}"
+echo "Current date: ${TODAY}"
+echo "Variables   : thetao so uo vo zos mlotst"
+echo "Domain      : 180W-179.9167E, 80S-Equator, upper 500 m"
+echo
+
+for year in $(seq "${YR0}" "${YRN}"); do
+
+    dt0="${year}-01-01"
+
+    if [[ "${year}" -lt "${YRN}" ]]; then
+        dtN="${year}-12-31"
+        DATASET="${DATASET_MY}"
+        F_="${year}0101_${year}1231_CMEMS_ocn_upper500m_SH_0p083_org.nc"
+
+        if [[ -s "${D_}/${F_}" ]]; then
+            echo "${F_} already exists. Skipping..."
+            continue
+        fi
+    else
+        # Current year: use the interim stream so the archive can be refreshed
+        # beyond the latest fully consolidated multiyear-reanalysis date.
+        dtN="${TODAY}"
+        DATASET="${DATASET_MYINT}"
+        F_="${year}0101_present_CMEMS_ocn_upper500m_SH_0p083_org.nc"
+
+        # Refresh the current-year file on each submission.
+        rm -f "${D_}/${F_}"
+    fi
+
+    echo "----------------------------------------------------------------"
+    echo "Year    : ${year}"
+    echo "Dataset : ${DATASET}"
+    echo "Period  : ${dt0} to ${dtN}"
+    echo "Output  : ${D_}/${F_}"
+    echo "----------------------------------------------------------------"
+
+    "${COPERNICUS}" subset \
+        --dataset-id "${DATASET}" \
+        --variable thetao \
+        --variable so \
+        --variable uo \
+        --variable vo \
+        --variable zos \
+        --variable mlotst \
+        --output-filename "${F_}" \
+        --output-directory "${D_}" \
+        --start-datetime "${dt0}" \
+        --end-datetime "${dtN}" \
+        --minimum-longitude -180 \
+        --maximum-longitude 179.9166717529297 \
+        --minimum-latitude -80 \
+        --maximum-latitude 0 \
+        --minimum-depth 0.5 \
+        --maximum-depth 500 \
+        --coordinates-selection-method strict-inside \
+        --disable-progress-bar \
+        --log-level INFO
+
+    echo "Processed year: ${year}"
+    echo
+done
+
+echo "All requested CMEMS upper-ocean downloads completed."

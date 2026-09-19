@@ -9,6 +9,10 @@
 #PBS -N floes_mthly_sic
 
 # Usage:
+#   # First update observations through the network-enabled copy queue:
+#   qsub ./download_observations.pbs
+#
+#   # After that job completes, run processing/figures:
 #   cd /path/to/mawsons-chest/floes
 #   qsub ./update_mthly_sea_ice_sci_chat_figs.pbs
 #
@@ -22,7 +26,7 @@ set -euo pipefail
 
 module purge
 module use /g/data/xp65/public/modules
-module load conda/analysis3-26.02
+module load conda/analysis3
 
 cd "${PBS_O_WORKDIR:-$PWD}"
 
@@ -36,10 +40,6 @@ export OMP_NUM_THREADS=1
 export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
 
 ARGS=(--project "$PROJECT" --user "$GADI_USER" --gadi-base "$FLOES_GADI_BASE" --seaice-root "$FLOES_SEAICE_ROOT" --era5-root "$FLOES_ERA5_ROOT")
-
-if [[ "${FLOES_UPDATE_OBSERVATIONS:-1}" == "1" ]]; then
-    ARGS+=(--update-observations)
-fi
 
 if [[ -n "${FLOES_YEAR:-}" ]]; then
     ARGS+=(--year "$FLOES_YEAR")

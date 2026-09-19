@@ -7,8 +7,6 @@ import sys
 import traceback
 from pathlib import Path
 
-import pandas as pd
-
 THIS = Path(__file__).resolve()
 FLOES_ROOT = THIS.parents[1]
 PARENT = FLOES_ROOT.parent
@@ -16,12 +14,6 @@ if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
 
 from floes.config import default_config, previous_complete_month  # noqa: E402
-from floes.io.download import (  # noqa: E402
-    build_bremen_amsr2_jobs,
-    build_esa_cci_sit_jobs,
-    build_nsidc_g02202_jobs,
-    download_jobs,
-)
 from floes.observations.bremen import BremenSeaIceReader  # noqa: E402
 from floes.observations.era5 import ERA5Reader  # noqa: E402
 from floes.observations.esa_cci import ESACCISITReader  # noqa: E402
@@ -104,13 +96,6 @@ def main(argv: list[str] | None = None) -> int:
         help="Base containing NSIDC/SIE_daily pre-integrated daily files.",
     )
     p.add_argument("--skip-will-suite", action="store_true", help="Skip the legacy NSIDC diagnostic reproductions.")
-    p.add_argument(
-        "--update-observations",
-        "--download-missing",
-        dest="update_observations",
-        action="store_true",
-        help="Discover and download current NSIDC, Bremen and ESA CCI products before plotting.",
-    )
     p.add_argument("--strict", action="store_true", help="Fail on first missing optional product.")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--verbose", action="store_true")
@@ -153,81 +138,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"NSIDC daily    : {args.nsidc_daily_base}")
     print(f"Figure dir     : {cfg.figure_root}")
     print(f"Gallery        : {cfg.markdown_gallery}")
+    print("Acquisition    : disabled in processing job; run qsub ./download_observations.pbs first")
 
     if args.dry_run:
         print("Dry run only; no figures generated.")
         return 0
 
     keep_going = not args.strict
-
-    def checked_download(jobs, *, min_bytes: int = 10_000):
-        if not jobs:
-            raise RuntimeError("The remote archive discovery returned no matching files.")
-        status = download_jobs(jobs, workers=4, retries=4, min_bytes=min_bytes)
-        if status:
-            raise RuntimeError("One or more observation downloads failed; see messages above.")
-        return f"checked {len(jobs)} files"
-
-    if args.update_observations:
-        def update_nsidc():
-            jobs = build_nsidc_g02202_jobs(
-                dest_root=Path(cfg.seaice_root) / "NSIDC",
-                hemis=["south"],
-                start_year=cfg.climatology_start,
-                end_year=args.year,
-                daily_mode="aggregate",
-                monthly_mode="aggregate",
-                include_ancillary=True,
-            )
-            jobs.extend(
-                build_nsidc_g02202_jobs(
-                    dest_root=Path(cfg.seaice_root) / "NSIDC",
-                    hemis=["north"],
-                    start_year=cfg.climatology_start,
-                    end_year=args.year,
-                    daily_mode="none",
-                    monthly_mode="aggregate",
-                    include_ancillary=True,
-                )
-            )
-            return checked_download(jobs)
-
-        _run_step(
-            "Update NSIDC G02202 V6",
-            update_nsidc,
-            keep_going=True,
-            manifest=manifest,
-            verbose=args.verbose,
-        )
-
-        def update_bremen():
-            end_period = pd.Period(f"{args.year:04d}-{args.month:02d}", freq="M")
-            recent_periods = [end_period - offset for offset in range(4)]
-            jobs = []
-            for year in sorted({period.year for period in recent_periods}):
-                months = [period.month for period in recent_periods if period.year == year]
-                jobs.extend(build_bremen_amsr2_jobs(dest_root=cfg.seaice_root, year=year, months=months))
-            return checked_download(jobs)
-
-        _run_step(
-            "Update University of Bremen AMSR2 SIC",
-            update_bremen,
-            keep_going=True,
-            manifest=manifest,
-            verbose=args.verbose,
-        )
-
-        def update_esa_cci():
-            jobs = build_esa_cci_sit_jobs(dest_root=cfg.seaice_root)
-            return checked_download(jobs)
-
-        _run_step(
-            "Update ESA CCI L2P/L3C SIT",
-            update_esa_cci,
-            keep_going=True,
-            manifest=manifest,
-            verbose=args.verbose,
-        )
 
     plotter = MonthlySeaIceChatPlotter(cfg)
     nsidc = NSIDCReader(cfg, hemisphere="SH", daily_base=args.nsidc_daily_base)

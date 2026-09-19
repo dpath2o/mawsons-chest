@@ -70,10 +70,16 @@ class NSIDCReader:
         files = self._monthly_aggregate_files()
         if files:
             return files
+        files = self._daily_aggregate_files()
+        if files:
+            return files
         return find_product_files(self.product_key, base=self.config.gadi_base, strict=False)
 
     def open_sic_dataset(self) -> xr.Dataset:
         files = self._monthly_aggregate_files()
+        if files:
+            return self._open_files(files)
+        files = self._daily_aggregate_files()
         if files:
             return self._open_files(files)
         return open_product(self.product_key, base=self.config.gadi_base, chunks=self.config.chunks, strict=True)

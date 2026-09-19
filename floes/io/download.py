@@ -204,7 +204,7 @@ def build_nsidc_g02202_jobs(*,
                             start_year: int,
                             end_year: int,
                             daily_mode: str = "aggregate",
-                            monthly_mode: str = "aggregate",
+                            monthly_mode: str = "none",
                             include_ancillary: bool = True) -> list[DownloadJob]:
     """Build NSIDC G02202 download jobs using HTTP directory discovery.
 
@@ -350,7 +350,12 @@ def nsidc_cli(argv: list[str] | None = None) -> int:
     p.add_argument("--end-year", type=int, required=True)
     p.add_argument("--hemis", nargs="+", choices=["north", "south"], default=["south"])
     p.add_argument("--daily", choices=["aggregate", "individual", "none"], default="none")
-    p.add_argument("--monthly", choices=["aggregate", "individual", "none"], default="aggregate")
+    p.add_argument(
+        "--monthly",
+        choices=["aggregate", "individual", "none"],
+        default="none",
+        help="Monthly downloads are opt-in; avoids duplicating the large rolling period aggregate.",
+    )
     p.add_argument("--ancillary", action="store_true")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--retries", type=int, default=4)
