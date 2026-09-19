@@ -92,8 +92,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--nsidc-daily-base",
         type=Path,
-        default=Path("/g/data/jk72/wrh581"),
-        help="Base containing NSIDC/SIE_daily pre-integrated daily files.",
+        default=Path("/g/data/gv90/da1339/SeaIce"),
+        help=(
+            "Base for NSIDC daily fallbacks. Local G02202 V6 gridded daily aggregates "
+            "are read from --seaice-root first; this keeps NSIDC processing on the "
+            "da1339 archive rather than the legacy wrh581 archive."
+        ),
     )
     p.add_argument("--skip-will-suite", action="store_true", help="Skip the legacy NSIDC diagnostic reproductions.")
     p.add_argument("--strict", action="store_true", help="Fail on first missing optional product.")

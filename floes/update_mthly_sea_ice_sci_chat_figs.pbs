@@ -26,7 +26,8 @@ set -euo pipefail
 
 module purge
 module use /g/data/xp65/public/modules
-module load conda/analysis3
+# Pin floes processing to the last known-good PyGMT 0.15 environment.
+module load conda/analysis3-26.02
 
 cd "${PBS_O_WORKDIR:-$PWD}"
 
@@ -35,6 +36,7 @@ GADI_USER="${GADI_USER:-${USER}}"
 FLOES_GADI_BASE="${FLOES_GADI_BASE:-/g/data/gv90/wrh581}"
 FLOES_SEAICE_ROOT="${FLOES_SEAICE_ROOT:-/g/data/gv90/da1339/SeaIce}"
 FLOES_ERA5_ROOT="${FLOES_ERA5_ROOT:-/g/data/rt52}"
+FLOES_NSIDC_DAILY_BASE="${FLOES_NSIDC_DAILY_BASE:-/g/data/gv90/da1339/SeaIce}"
 
 export OMP_NUM_THREADS=1
 export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"

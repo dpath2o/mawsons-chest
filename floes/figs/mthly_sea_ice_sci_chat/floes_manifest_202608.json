@@ -4,61 +4,49 @@
   "gadi_base": "/g/data/gv90/wrh581",
   "seaice_root": "/g/data/gv90/da1339/SeaIce",
   "era5_root": "/g/data/rt52",
-  "nsidc_daily_base": "/g/data/jk72/wrh581",
+  "nsidc_daily_base": "/g/data/gv90/da1339/SeaIce",
   "figure_root": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat",
   "gallery": "/g/data/gv90/da1339/src/mawsons-chest/floes/docs/mthly_sea_ice_sci_chat_figs.md",
   "steps": {
-    "Update NSIDC G02202 V6": {
-      "status": "skipped_or_failed",
-      "error": "URLError(OSError(101, 'Network is unreachable'))"
-    },
-    "Update University of Bremen AMSR2 SIC": {
-      "status": "skipped_or_failed",
-      "error": "URLError(OSError(101, 'Network is unreachable'))"
-    },
-    "Update ESA CCI L2P/L3C SIT": {
-      "status": "skipped_or_failed",
-      "error": "URLError(OSError(101, 'Network is unreachable'))"
-    },
     "NSIDC SIC anomaly map": {
       "status": "ok",
-      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202607.png"
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_sic_anomaly_202608.png"
     },
     "NSIDC total SIA/SIE time series": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"No area variable found in nsidc_cell_area_sh; variables=['adj123', 'crs', 'invalid_ice_mask', 'l90c', 'latitude', 'longitude', 'surface_type', 'am2_cdr_seaice_conc_threshold']\")"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SH_total_SIA_SIE_monthly.png"
     },
     "Process University of Bremen SIC/SIA/SIE": {
-      "status": "skipped_or_failed",
-      "error": "FileNotFoundError('No University of Bremen AMSR2 netCDF files found under /g/data/gv90/da1339/SeaIce/University_Bremen/AMSR2/asi_daygrid_swath/s6250')"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/SeaIce/University_Bremen/AMSR2/asi_daygrid_swath/s6250/processed/BREMEN_AMSR2_SH_SIC_monthly.nc; /g/data/gv90/da1339/SeaIce/University_Bremen/AMSR2/asi_daygrid_swath/s6250/processed/BREMEN_AMSR2_SH_SIA_SIE_daily.nc"
     },
     "University of Bremen AMSR2 SIC/SIE map": {
-      "status": "skipped_or_failed",
-      "error": "FileNotFoundError('No University of Bremen AMSR2 netCDF files found under /g/data/gv90/da1339/SeaIce/University_Bremen/AMSR2/asi_daygrid_swath/s6250')"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/BREMEN_AMSR2_SH_sic_SIE_202608.png"
     },
     "ESA CCI L3C SIT map": {
       "status": "ok",
       "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202404.png"
     },
     "Will: SH monthly SIA anomaly": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"No area variable found in nsidc_cell_area_sh; variables=['adj123', 'crs', 'invalid_ice_mask', 'l90c', 'latitude', 'longitude', 'surface_type', 'am2_cdr_seaice_conc_threshold']\")"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_absolute.png"
     },
     "Will: SH standardised monthly SIA anomaly": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"No area variable found in nsidc_cell_area_sh; variables=['adj123', 'crs', 'invalid_ice_mask', 'l90c', 'latitude', 'longitude', 'surface_type', 'am2_cdr_seaice_conc_threshold']\")"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIA_cdr_monthly_tplot_standardised.png"
     },
     "Will: Arctic-Antarctic SIE comparison": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"No area variable found in nsidc_cell_area_sh; variables=['adj123', 'crs', 'invalid_ice_mask', 'l90c', 'latitude', 'longitude', 'surface_type', 'am2_cdr_seaice_conc_threshold']\")"
+      "status": "ok",
+      "result": "(PosixPath('/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_annual.png'), PosixPath('/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_Arctic_vs_Antarctic_monthly_anomalies.png'))"
     },
     "Will: SH monthly SIE anomalies by year": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"No area variable found in nsidc_cell_area_sh; variables=['adj123', 'crs', 'invalid_ice_mask', 'l90c', 'latitude', 'longitude', 'surface_type', 'am2_cdr_seaice_conc_threshold']\")"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIE_cdr_monthly_anoms_byyear.png"
     },
     "Will: SH SIE maximum versus date": {
-      "status": "skipped_or_failed",
-      "error": "KeyError(\"No area variable found in nsidc_cell_area_sh; variables=['adj123', 'crs', 'invalid_ice_mask', 'l90c', 'latitude', 'longitude', 'surface_type', 'am2_cdr_seaice_conc_threshold']\")"
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/NSIDC_SIEmax_vs_day-of-max.png"
     },
     "OISST SST anomaly map": {
       "status": "ok",
@@ -66,7 +54,7 @@
     },
     "ERA5 wind map": {
       "status": "ok",
-      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202607.png"
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ERA5_wind_SIE_SH_202608.png"
     },
     "ORAS5 depth-time diagnostic": {
       "status": "ok",

@@ -143,19 +143,128 @@ class NSIDCReader:
             decode_timedelta=False,
         )
 
+    def _daily_file_map(self) -> dict[int, Path]:
+        """Return the selected local G02202 daily aggregate keyed by start year."""
+        files: dict[int, Path] = {}
+        for path in self._daily_aggregate_files():
+            match = _AGGREGATE_RE.fullmatch(path.name)
+            if match:
+                files[int(match.group(2)) // 10_000] = path
+        return files
+
+    def _load_local_sic_file(self, path: Path, *, month: int | None = None) -> xr.DataArray:
+        """Load SIC from one yearly G02202 aggregate, optionally reduced to one month."""
+        with xr.open_dataset(
+            path,
+            engine="netcdf4",
+            chunks=None,
+            decode_timedelta=False,
+        ) as ds:
+            name = next(
+                (
+                    candidate
+                    for candidate in (
+                        "cdr_seaice_conc",
+                        "cdr_seaice_conc_monthly",
+                        "ice_conc",
+                        "seaice_conc",
+                        "sic",
+                    )
+                    if candidate in ds
+                ),
+                None,
+            )
+            if name is None:
+                raise KeyError(f"No recognised SIC variable in NSIDC dataset: {list(ds.data_vars)}")
+
+            sic = standardise_sic(ds[name])
+            if month is not None:
+                sic = sic.where(sic["time"].dt.month == int(month), drop=True)
+                if sic.sizes.get("time", 0) == 0:
+                    raise ValueError(f"No NSIDC observations for month={month:02d} in {path.name}")
+                sic = sic.mean("time", skipna=True)
+
+            sic = self._attach_geographic_coords(sic, ds)
+            sic.name = "sic"
+            return sic.load()
+
+    def _latest_local_year_month(
+        self,
+        *,
+        requested_year: int,
+        requested_month: int,
+    ) -> tuple[int, int]:
+        """Return the latest locally available daily-aggregate month <= requested."""
+        files = self._daily_file_map()
+        for year in sorted((y for y in files if y <= requested_year), reverse=True):
+            with xr.open_dataset(
+                files[year],
+                engine="netcdf4",
+                chunks=None,
+                decode_timedelta=False,
+            ) as ds:
+                months = sorted({int(v) for v in ds["time"].dt.month.values})
+            if year == requested_year:
+                months = [candidate for candidate in months if candidate <= requested_month]
+            if months:
+                return year, max(months)
+        raise ValueError(
+            f"No local NSIDC G02202 daily aggregate month <= "
+            f"{requested_year:04d}-{requested_month:02d}"
+        )
+
+    def _daily_total_sia_sie_local(self) -> xr.Dataset:
+        """Compute daily SIA/SIE sequentially from local yearly G02202 aggregates."""
+        area = self.open_area()
+        yearly: list[xr.Dataset] = []
+        for _, path in sorted(self._daily_file_map().items()):
+            sic = self._load_local_sic_file(path)
+            totals = compute_sia_sie(sic, area, threshold=self.config.sic_threshold).load()
+            yearly.append(totals)
+        if not yearly:
+            raise FileNotFoundError("No local NSIDC G02202 yearly daily aggregates were found.")
+        out = xr.concat(yearly, dim="time").sortby("time")
+        _, unique = np.unique(out["time"].values, return_index=True)
+        return out.isel(time=sorted(unique))
+
     def open_area(self) -> xr.DataArray:
-        ancillary = self._ancillary_files()
-        if ancillary:
-            ds = xr.open_dataset(sorted(ancillary)[-1], chunks=None, decode_timedelta=False)
+        """Open the NSIDC-0771 25 km polar-stereographic cell-area field."""
+        token = "S25km" if self.hemisphere == "SH" else "N25km"
+        local_root = Path(self.config.seaice_root) / "NSIDC"
+        local = sorted(local_root.rglob(f"*CellArea*PS*{token}*.nc"))
+
+        if local:
+            with xr.open_dataset(
+                local[-1],
+                engine="netcdf4",
+                chunks=None,
+                decode_timedelta=False,
+            ) as ds:
+                if "cell_area" in ds:
+                    area = ds["cell_area"].load()
+                else:
+                    candidates = [v for v in ds.data_vars if "area" in v.lower()]
+                    if not candidates:
+                        raise KeyError(
+                            f"No area variable found in NSIDC-0771 file {local[-1]}; "
+                            f"variables={list(ds.data_vars)}"
+                        )
+                    area = ds[candidates[0]].load()
         else:
             ds = open_product(self.area_key, base=self.config.gadi_base, chunks=None, strict=True)
-        if "cell_area" in ds:
-            area = ds["cell_area"]
-        else:
-            candidates = [v for v in ds.data_vars if "area" in v.lower()]
-            if not candidates:
-                raise KeyError(f"No area variable found in {self.area_key}; variables={list(ds.data_vars)}")
-            area = ds[candidates[0]]
+            try:
+                if "cell_area" in ds:
+                    area = ds["cell_area"].load()
+                else:
+                    candidates = [v for v in ds.data_vars if "area" in v.lower()]
+                    if not candidates:
+                        raise KeyError(
+                            f"No area variable found in {self.area_key}; variables={list(ds.data_vars)}"
+                        )
+                    area = ds[candidates[0]].load()
+            finally:
+                ds.close()
+
         area.attrs.setdefault("units", "m2")
         return area
 
@@ -178,8 +287,13 @@ class NSIDCReader:
         ancillary = self._ancillary_files()
         if not ancillary:
             return out
-        coords = xr.open_dataset(ancillary[-1], chunks=None, decode_timedelta=False)
-        return attach_dataset_coordinates(out, coords)
+        with xr.open_dataset(
+            ancillary[-1],
+            engine="netcdf4",
+            chunks=None,
+            decode_timedelta=False,
+        ) as coords:
+            return attach_dataset_coordinates(out, coords).load()
 
     def sic(self) -> xr.DataArray:
         ds = self.open_sic_dataset()
@@ -192,9 +306,19 @@ class NSIDCReader:
         raise KeyError(f"No recognised SIC variable in NSIDC dataset: {list(ds.data_vars)}")
 
     def total_sia_sie(self) -> xr.Dataset:
-        out = compute_sia_sie(self.sic(), self.open_area(), threshold=self.config.sic_threshold)
+        if self._daily_aggregate_files():
+            daily = self._daily_total_sia_sie_local()
+            out = daily.resample(time="MS").mean(skipna=True)
+        else:
+            out = compute_sia_sie(self.sic(), self.open_area(), threshold=self.config.sic_threshold)
         out = mask_months(out)
-        out.attrs.update({"source": "NSIDC CDR", "hemisphere": self.hemisphere})
+        out.attrs.update(
+            {
+                "source": "NSIDC G02202 V6",
+                "hemisphere": self.hemisphere,
+                "temporal_resolution": "monthly",
+            }
+        )
         return out
 
     def daily_total_sia_sie(self) -> xr.Dataset:
@@ -203,22 +327,7 @@ class NSIDCReader:
             raise NotImplementedError("Only the Southern Hemisphere daily total product is registered.")
         daily_files = self._daily_aggregate_files()
         if daily_files:
-            ds = self._open_files(daily_files)
-            name = next(
-                (
-                    candidate
-                    for candidate in ("cdr_seaice_conc", "ice_conc", "seaice_conc", "sic")
-                    if candidate in ds
-                ),
-                None,
-            )
-            if name is None:
-                raise KeyError(f"No recognised daily SIC variable in NSIDC dataset: {list(ds.data_vars)}")
-            sic = self._attach_geographic_coords(standardise_sic(ds[name]), ds)
-            sic = sic.sortby("time")
-            _, unique = np.unique(sic["time"].values, return_index=True)
-            sic = sic.isel(time=sorted(unique))
-            out = compute_sia_sie(sic, self.open_area(), threshold=self.config.sic_threshold)
+            out = self._daily_total_sia_sie_local()
             out.attrs.update(
                 {
                     "source": "NSIDC G02202 V6 gridded daily SIC",
@@ -269,14 +378,72 @@ class NSIDCReader:
         return out
 
     def sic_month_and_climatology(self, *, year: int, month: int, fallback_latest: bool = True) -> xr.Dataset:
-        sic = self.sic()
         requested_year, requested_month = int(year), int(month)
-        exact = True
-        if fallback_latest:
-            year, month, exact = resolve_year_month(sic, requested_year, requested_month)
-        clim = monthly_climatology(sic, start_year=self.config.climatology_start, end_year=self.config.climatology_end)
-        month_field = select_year_month(sic, year, month)
-        clim_field = clim.sel(month=month)
+        daily_files = self._daily_file_map()
+
+        if daily_files:
+            selected_year = requested_year
+            selected_month = requested_month
+            exact = True
+            try:
+                month_field = self._load_local_sic_file(
+                    daily_files[selected_year],
+                    month=selected_month,
+                )
+            except (KeyError, ValueError):
+                if not fallback_latest:
+                    raise
+                selected_year, selected_month = self._latest_local_year_month(
+                    requested_year=requested_year,
+                    requested_month=requested_month,
+                )
+                month_field = self._load_local_sic_file(
+                    daily_files[selected_year],
+                    month=selected_month,
+                )
+                exact = False
+
+            climatology_fields: list[xr.DataArray] = []
+            climatology_years: list[int] = []
+            for climatology_year in range(
+                self.config.climatology_start,
+                self.config.climatology_end + 1,
+            ):
+                path = daily_files.get(climatology_year)
+                if path is None:
+                    continue
+                try:
+                    field = self._load_local_sic_file(path, month=selected_month)
+                except ValueError:
+                    continue
+                climatology_fields.append(field)
+                climatology_years.append(climatology_year)
+
+            if not climatology_fields:
+                raise ValueError(
+                    f"No NSIDC G02202 fields available for month={selected_month:02d} "
+                    f"during climatology {self.config.climatology_start}-"
+                    f"{self.config.climatology_end}"
+                )
+
+            clim_field = xr.concat(
+                climatology_fields,
+                dim=xr.IndexVariable("climatology_year", climatology_years),
+            ).mean("climatology_year", skipna=True)
+            year, month = selected_year, selected_month
+        else:
+            sic = self.sic()
+            exact = True
+            if fallback_latest:
+                year, month, exact = resolve_year_month(sic, requested_year, requested_month)
+            clim = monthly_climatology(
+                sic,
+                start_year=self.config.climatology_start,
+                end_year=self.config.climatology_end,
+            )
+            month_field = select_year_month(sic, year, month)
+            clim_field = clim.sel(month=month)
+
         anom = month_field - clim_field
         anom.name = "sic_anom"
         common_attrs = {
