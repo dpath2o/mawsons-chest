@@ -24,9 +24,13 @@
       "status": "ok",
       "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/BREMEN_AMSR2_SH_sic_SIE_202608.png"
     },
-    "ESA CCI L3C SIT map": {
+    "ICESat-2 ATL20 monthly mean freeboard map": {
       "status": "ok",
-      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202404.png"
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202604.png"
+    },
+    "ICESat-2 ATL20 monthly mean freeboard time series": {
+      "status": "ok",
+      "result": "/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_monthly_mean_freeboard_timeseries.png"
     },
     "NSIDC rolling map archive": {
       "status": "ok",
@@ -36,7 +40,7 @@
       "status": "ok",
       "result": "3"
     },
-    "ESA CCI rolling map archive": {
+    "ICESat-2 ATL20 rolling map archive": {
       "status": "ok",
       "result": "9"
     },

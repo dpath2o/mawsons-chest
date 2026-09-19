@@ -14,6 +14,7 @@ from floes.config import default_config, previous_complete_month  # noqa: E402
 from floes.observations.bremen import BremenSeaIceReader  # noqa: E402
 from floes.observations.era5 import ERA5Reader  # noqa: E402
 from floes.observations.esa_cci import ESACCISITReader  # noqa: E402
+from floes.observations.icesat2_atl20 import ICESat2ATL20Reader  # noqa: E402
 from floes.observations.nsidc import NSIDCReader  # noqa: E402
 from floes.observations.ocean import OceanReader  # noqa: E402
 from floes.observations.oisst import OISSTReader  # noqa: E402
@@ -146,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     plotter = MonthlySeaIceChatPlotter(cfg)
     nsidc = NSIDCReader(cfg, hemisphere="SH", daily_base=args.nsidc_daily_base)
     bremen = BremenSeaIceReader(cfg)
+    atl20 = ICESat2ATL20Reader(cfg, hemisphere="SH")
     esa_cci = ESACCISITReader(cfg)
     monthly_totals: dict[str, object] = {}
     daily_totals: dict[str, object] = {}
@@ -153,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     bremen_cache: dict[tuple[int, int], object] = {}
     nsidc_history: dict[tuple[int, int], Path] = {}
     bremen_history: dict[tuple[int, int], Path] = {}
+    atl20_history: dict[tuple[int, int], Path] = {}
     esa_history: dict[tuple[int, int], Path] = {}
     era5_history: dict[tuple[int, int], Path] = {}
 
@@ -244,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
                                             value_range=(0.0, 1.0),
                                             colorbar_label="sea-ice concentration",
                                             colorbar_unit="fraction",
-                                            ice_edges=[(ice_edge_for(y, m), "1.0p,black"),(da, "1.0p,orange")],
+                                            ice_edges=[(ice_edge_for(y, m), "1.0p,red"),(da, "1.0p,orange")],
                                             stride=2)
 
     def bremen_processed_products():
@@ -270,6 +273,53 @@ def main(argv: list[str] | None = None) -> int:
                 except Exception as exc:  # noqa: BLE001
                     print(f"WARNING: Bremen history map unavailable for {year:04d}-{month:02d}: {exc}")
         return len(bremen_history)
+
+    def atl20_freeboard_map_for(year: int, month: int, *, fallback_latest: bool = False):
+        da = atl20.month(year=year, month=month, fallback_latest=fallback_latest).compute()
+        y, m, exact = _actual_ym(da, args.year, args.month)
+        if fallback_latest and not exact:
+            print(
+                f"Using latest available ICESat-2 ATL20 month {y:04d}-{m:02d} "
+                f"for requested {args.year:04d}-{args.month:02d}."
+            )
+        out = cfg.figure_root / f"ICESat2_ATL20_SH_mean_freeboard_{y:04d}{m:02d}.png"
+        edges = []
+        try:
+            edges.append((bremen_edge_for(y, m), "1.2p,orange"))
+        except Exception as exc:  # noqa: BLE001
+            print(f"WARNING: Bremen SIE edge unavailable for ATL20 {y:04d}-{m:02d}: {exc}")
+        return plotter.plot_gridded_anomaly(
+            da,
+            output=out,
+            title=f"{y:04d}-{m:02d}",
+            cpt="cmocean/thermal",
+            value_range=(0.0, 1.0),
+            colorbar_label="monthly mean freeboard",
+            colorbar_unit="m",
+            ice_edges=edges,
+            stride=1,
+        )
+
+    def atl20_freeboard_map():
+        return atl20_freeboard_map_for(args.year, args.month, fallback_latest=True)
+
+    def atl20_history_maps():
+        main = atl20.month(year=args.year, month=args.month, fallback_latest=True)
+        anchor_year, anchor_month, _ = _actual_ym(main, args.year, args.month)
+        for offset in range(3):
+            for year, month in _previous_months(anchor_year - offset, anchor_month, 3):
+                try:
+                    atl20_history[(year, month)] = Path(atl20_freeboard_map_for(year, month))
+                except Exception as exc:  # noqa: BLE001
+                    print(f"WARNING: ATL20 history map unavailable for {year:04d}-{month:02d}: {exc}")
+        return len(atl20_history)
+
+    def atl20_freeboard_timeseries():
+        series = atl20.monthly_mean_series().compute()
+        nc = cfg.figure_root / "ICESat2_ATL20_SH_monthly_mean_freeboard.nc"
+        series.to_dataset(name="freeboard").to_netcdf(nc)
+        out = cfg.figure_root / "ICESat2_ATL20_SH_monthly_mean_freeboard_timeseries.png"
+        return plotter.plot_freeboard_timeseries(series, output=out)
 
     def esa_cci_sit_map_for(year: int, month: int, *, fallback_latest: bool = False):
         da = esa_cci.month(year=year, month=month, fallback_latest=fallback_latest).compute()
@@ -309,7 +359,8 @@ def main(argv: list[str] | None = None) -> int:
     _run_step("NSIDC total SIA/SIE time series", nsidc_sia_ts, keep_going=keep_going, manifest=manifest, verbose=args.verbose)
     _run_step("Process University of Bremen SIC/SIA/SIE", bremen_processed_products, keep_going=True, manifest=manifest, verbose=args.verbose)
     bremen_sic_path = _run_step("University of Bremen AMSR2 SIC/SIE map", bremen_sic_map, keep_going=True, manifest=manifest, verbose=args.verbose)
-    esa_sit_path = _run_step("ESA CCI L3C SIT map", esa_cci_sit_map, keep_going=True, manifest=manifest, verbose=args.verbose)
+    atl20_map_path = _run_step("ICESat-2 ATL20 monthly mean freeboard map", atl20_freeboard_map, keep_going=True, manifest=manifest, verbose=args.verbose)
+    atl20_ts_path = _run_step("ICESat-2 ATL20 monthly mean freeboard time series", atl20_freeboard_timeseries, keep_going=True, manifest=manifest, verbose=args.verbose)
 
     will_sia_path = None
     will_sie_by_year_path = None
@@ -333,8 +384,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     _run_step(
-        "ESA CCI rolling map archive",
-        esa_history_maps,
+        "ICESat-2 ATL20 rolling map archive",
+        atl20_history_maps,
         keep_going=True,
         manifest=manifest,
         verbose=args.verbose,
@@ -600,7 +651,7 @@ def main(argv: list[str] | None = None) -> int:
                 Path(bremen_sic_path),
                 f"University of Bremen AMSR2 SH SIC and SIE — {stamp[:4]}-{stamp[4:]}",
                 caption=(
-                    "Monthly-mean University of Bremen ASI-AMSR2 SIC at 6.25 km. The black contour is the "
+                    "Monthly-mean University of Bremen ASI-AMSR2 SIC at 6.25 km. The red contour is the "
                     "NSIDC G02202 V6 15% SIC edge and the solid orange contour is the Bremen 15% edge. "
                     "This independent, higher-resolution AMSR2 retrieval is retained alongside NSIDC to expose "
                     "edge sensitivity to sensor, retrieval method and spatial resolution rather than relying on "
@@ -614,23 +665,37 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             )
         )
-    if esa_sit_path:
-        name = Path(esa_sit_path).stem
+    if atl20_map_path:
+        name = Path(atl20_map_path).stem
         stamp = name.rsplit("_", 1)[-1]
         gallery_figures.append(
             GalleryFigure(
-                Path(esa_sit_path),
-                f"ESA CCI L3C SH monthly SIT — {stamp[:4]}-{stamp[4:]}",
+                Path(atl20_map_path),
+                f"ICESat-2 ATL20 SH monthly mean freeboard — {stamp[:4]}-{stamp[4:]}",
                 caption=(
-                    "Latest locally available ESA CCI v4.0 L3C monthly sea-ice thickness, averaging available "
-                    "sensor fields on their common grid where more than one sensor contributes. The black contour "
-                    "is the matching-month NSIDC 15% SIC edge."
+                    "NASA ICESat-2 ATL20 v005 monthly mean sea-ice freeboard on the native 25 km "
+                    "Southern Hemisphere polar stereographic grid. ATL20 monthly grid-cell means use "
+                    "all available daily mean freeboards weighted by contributing segment length. "
+                    "The solid orange contour is the University of Bremen AMSR2 15% SIC sea-ice edge "
+                    "for the matching month. Freeboard is not sea-ice thickness."
                 ),
                 extra_markdown=_history_table(
-                    esa_history,
+                    atl20_history,
                     anchor_year=int(stamp[:4]),
                     anchor_month=int(stamp[4:]),
-                    prefix="ESA_CCI_L3C_SH_sit",
+                    prefix="ICESat2_ATL20_SH_mean_freeboard",
+                ),
+            )
+        )
+    if atl20_ts_path:
+        gallery_figures.append(
+            GalleryFigure(
+                Path(atl20_ts_path),
+                "ICESat-2 ATL20 SH monthly mean freeboard time series",
+                caption=(
+                    "Southern Hemisphere spatial mean of valid 25 km ATL20 v005 monthly mean-freeboard "
+                    "grid cells. The ICESat-2 record begins in October 2018, so this panel shows the "
+                    "complete available record rather than a full ten years."
                 ),
             )
         )

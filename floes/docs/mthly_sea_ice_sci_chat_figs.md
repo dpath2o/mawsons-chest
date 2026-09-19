@@ -1,6 +1,6 @@
 # Monthly Sea Ice Science Chat Figures
 
-Last refreshed: 2026-09-19T15:43:13
+Last refreshed: 2026-09-20T04:41:43
 
 Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ice_sci_chat`
 
@@ -35,7 +35,7 @@ Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ic
 
 ![University of Bremen AMSR2 SH SIC and SIE — 2026-08](../figs/mthly_sea_ice_sci_chat/BREMEN_AMSR2_SH_sic_SIE_202608.png)
 
-*Monthly-mean University of Bremen ASI-AMSR2 SIC at 6.25 km. The black contour is the NSIDC G02202 V6 15% SIC edge and the solid orange contour is the Bremen 15% edge. This independent, higher-resolution AMSR2 retrieval is retained alongside NSIDC to expose edge sensitivity to sensor, retrieval method and spatial resolution rather than relying on a single sea-ice product.*
+*Monthly-mean University of Bremen ASI-AMSR2 SIC at 6.25 km. The red contour is the NSIDC G02202 V6 15% SIC edge and the solid orange contour is the Bremen 15% edge. This independent, higher-resolution AMSR2 retrieval is retained alongside NSIDC to expose edge sensitivity to sensor, retrieval method and spatial resolution rather than relying on a single sea-ice product.*
 
 
 **Rolling three-month / three-year archive**
@@ -46,20 +46,26 @@ Figure directory: `/g/data/gv90/da1339/src/mawsons-chest/floes/figs/mthly_sea_ic
 | 2025 | — | — | — |
 | 2026 | [2026-05](../figs/mthly_sea_ice_sci_chat/BREMEN_AMSR2_SH_sic_SIE_202605.png) | [2026-06](../figs/mthly_sea_ice_sci_chat/BREMEN_AMSR2_SH_sic_SIE_202606.png) | [2026-07](../figs/mthly_sea_ice_sci_chat/BREMEN_AMSR2_SH_sic_SIE_202607.png) |
 
-## ESA CCI L3C SH monthly SIT — 2024-04
+## ICESat-2 ATL20 SH monthly mean freeboard — 2026-04
 
-![ESA CCI L3C SH monthly SIT — 2024-04](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202404.png)
+![ICESat-2 ATL20 SH monthly mean freeboard — 2026-04](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202604.png)
 
-*Latest locally available ESA CCI v4.0 L3C monthly sea-ice thickness, averaging available sensor fields on their common grid where more than one sensor contributes. The black contour is the matching-month NSIDC 15% SIC edge.*
+*NASA ICESat-2 ATL20 v005 monthly mean sea-ice freeboard on the native 25 km Southern Hemisphere polar stereographic grid. ATL20 monthly grid-cell means use all available daily mean freeboards weighted by contributing segment length. The solid orange contour is the University of Bremen AMSR2 15% SIC sea-ice edge for the matching month. Freeboard is not sea-ice thickness.*
 
 
 **Rolling three-month / three-year archive**
 
 | Year | 01 | 02 | 03 |
 | --- | --- | --- | --- |
-| 2022 | [2022-01](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202201.png) | [2022-02](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202202.png) | [2022-03](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202203.png) |
-| 2023 | [2023-01](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202301.png) | [2023-02](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202302.png) | [2023-03](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202303.png) |
-| 2024 | [2024-01](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202401.png) | [2024-02](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202402.png) | [2024-03](../figs/mthly_sea_ice_sci_chat/ESA_CCI_L3C_SH_sit_202403.png) |
+| 2024 | [2024-01](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202401.png) | [2024-02](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202402.png) | [2024-03](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202403.png) |
+| 2025 | [2025-01](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202501.png) | [2025-02](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202502.png) | [2025-03](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202503.png) |
+| 2026 | [2026-01](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202601.png) | [2026-02](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202602.png) | [2026-03](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_mean_freeboard_202603.png) |
+
+## ICESat-2 ATL20 SH monthly mean freeboard time series
+
+![ICESat-2 ATL20 SH monthly mean freeboard time series](../figs/mthly_sea_ice_sci_chat/ICESat2_ATL20_SH_monthly_mean_freeboard_timeseries.png)
+
+*Southern Hemisphere spatial mean of valid 25 km ATL20 v005 monthly mean-freeboard grid cells. The ICESat-2 record begins in October 2018, so this panel shows the complete available record rather than a full ten years.*
 
 ## OISST global SST anomaly and observed SIE — 2026-07
 

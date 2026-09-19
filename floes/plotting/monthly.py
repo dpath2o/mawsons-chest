@@ -207,3 +207,35 @@ class MonthlySeaIceChatPlotter:
         fig.colorbar(cmap=str(cpt_path), frame=frame)
         fig.savefig(str(output), dpi=200)
         return output
+
+    def plot_freeboard_timeseries(
+        self,
+        da: xr.DataArray,
+        *,
+        output: Path,
+        title: str = "Southern Hemisphere ICESat-2 ATL20 monthly mean freeboard",
+    ) -> Path:
+        """Plot the complete monthly ATL20 freeboard record."""
+        pygmt, fig = self._figure()
+        output = Path(output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if "time" not in da.coords:
+            raise ValueError("Freeboard DataArray must contain a time coordinate.")
+        series = da.dropna("time")
+        if series.size == 0:
+            raise ValueError("No valid ATL20 monthly mean freeboard values available.")
+        times = pd.to_datetime(series["time"].values)
+        x = times.year + (times.month - 0.5) / 12.0
+        y = series.values
+        xmin, xmax = float(x.min()), float(x.max())
+        ymin, ymax = float(y.min()), float(y.max())
+        pad_y = max((ymax - ymin) * 0.12, 0.02)
+        fig.basemap(
+            region=[xmin, xmax, max(0.0, ymin - pad_y), ymax + pad_y],
+            projection="X18c/8c",
+            frame=["xaf+lYear", "yaf+lFreeboard (m)", f"+t{title}"],
+        )
+        fig.plot(x=x, y=y, pen="1.4p,black")
+        fig.plot(x=x, y=y, style="c0.09c", fill="orange", pen="0.25p,black")
+        fig.savefig(str(output), dpi=200)
+        return output
