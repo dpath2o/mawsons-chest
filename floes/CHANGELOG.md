@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 - gridded sea-ice observation updates
+
+- Read the local gridded NSIDC G02202 V6 archive before legacy integrated products.
+- Added University of Bremen daily ASI-AMSR2 discovery, downloading, SIC mapping and derived SIA/SIE products.
+- Added ESA CCI L2P/L3C THREDDS discovery and a latest-available monthly L3C thickness map.
+- Fixed curvilinear PyGMT field rendering and added NSIDC/Bremen 15 percent ice-edge comparisons to OISST and ERA5 maps.
+- Made the PBS monthly workflow update the observation archives by default.
+
 ## 0.1.0 - initial scaffold
 
 - Added `floes` package layout for observational sea-ice analysis inside `mawsons-chest`.

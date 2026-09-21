@@ -8,10 +8,11 @@ dependencies = [
   "pandas",
   "xarray",
   "netCDF4",
+  "pyproj",
 ]
 
 [project.optional-dependencies]
-plotting = ["pygmt"]
+plotting = ["pygmt", "matplotlib"]
 dask = ["dask"]
 
 [tool.ruff]

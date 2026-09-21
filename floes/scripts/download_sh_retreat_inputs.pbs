@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -P jk72
+#PBS -q copyq
+#PBS -l walltime=10:00:00
+#PBS -l ncpus=1
+#PBS -l mem=32GB
+#PBS -l storage=gdata/gv90+gdata/rt52+gdata/xp65
+#PBS -j oe
+#PBS -N sh_retreat_inputs
+
+set -euo pipefail
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3
+source /g/data/gv90/da1339/venvs/cmems/bin/activate
+
+cd "${PBS_O_WORKDIR:-$PWD}"
+
+END_DATE="${END_DATE:-2026-09-19}"
+WINDOW_DAYS="${WINDOW_DAYS:-91}"
+COMPARISON_YEARS="${COMPARISON_YEARS:-3}"
+
+python -u ./downloading/download_sh_retreat_inputs.py --end-date "${END_DATE}" --window-days "${WINDOW_DAYS}" --comparison-years "${COMPARISON_YEARS}"
