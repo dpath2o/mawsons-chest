@@ -62,4 +62,4 @@ if [[ "${FLOES_VERBOSE:-0}" == "1" ]]; then
     ARGS+=(--verbose)
 fi
 
-python -u scripts/update_mthly_sea_ice_sci_chat_figs.py "${ARGS[@]}"
+python -u ./update_mthly_sea_ice_sci_chat_figs.py "${ARGS[@]}"

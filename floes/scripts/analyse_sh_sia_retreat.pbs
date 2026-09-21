@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -P jk72
+#PBS -q normal
+#PBS -l walltime=03:00:00
+#PBS -l ncpus=8
+#PBS -l mem=64GB
+#PBS -l storage=gdata/gv90+gdata/jk72+gdata/xp65+gdata/rt52
+#PBS -j oe
+#PBS -N sh_sia_retreat
+
+set -euo pipefail
+module purge
+module use /g/data/xp65/public/modules
+module load conda/analysis3-26.02
+
+cd "${PBS_O_WORKDIR:-$PWD}"
+export OMP_NUM_THREADS=1
+export PYTHONPATH="$(dirname "$PWD"):${PYTHONPATH:-}"
+
+python -u ./analyse_sh_sia_retreat.py

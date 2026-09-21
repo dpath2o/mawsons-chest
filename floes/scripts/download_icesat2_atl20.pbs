@@ -18,4 +18,4 @@ DEST="${ATL20_DEST_ROOT:-/g/data/gv90/da1339/SeaIce/ICESat2/ATL20/V005}"
 WORKERS="${ATL20_WORKERS:-4}"
 MANIFEST="${DEST}/atl20_v005_manifest.tsv"
 
-python -u scripts/downloading/download_icesat2_atl20.py   --dest-root "${DEST}"   --workers "${WORKERS}"   --manifest "${MANIFEST}"
+python -u ./downloading/download_icesat2_atl20.py --dest-root "${DEST}" --workers "${WORKERS}" --manifest "${MANIFEST}"

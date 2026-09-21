@@ -50,4 +50,4 @@ if [[ -n "${FLOES_MONTH:-}" ]]; then
     ARGS+=(--month "$FLOES_MONTH")
 fi
 
-python -u scripts/downloading/download_observations.py "${ARGS[@]}"
+python -u ./downloading/download_observations.py "${ARGS[@]}"
